@@ -1,0 +1,37 @@
+# =========================
+# Finova - Git Ignore
+# =========================
+
+# ===== Java / Maven =====
+target/
+*.class
+
+# ===== Eclipse =====
+.classpath
+.project
+.settings/
+
+# ===== IntelliJ / Android Studio =====
+.idea/
+*.iml
+
+# ===== Android =====
+.gradle/
+**/build/
+local.properties
+
+# ===== Logs =====
+*.log
+
+# ===== Environment / Secrets =====
+.env
+*.env
+
+# ===== OS =====
+Thumbs.db
+Desktop.ini
+
+# ===== Database local files =====
+*.db
+*.sqlite
+*.sqlite3
