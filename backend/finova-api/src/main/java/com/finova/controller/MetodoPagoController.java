@@ -20,16 +20,24 @@ public class MetodoPagoController {
         return ResponseEntity.ok(metodoPagoService.listarMetodosPago());
     }
 
+    @GetMapping("/activos")
+    public ResponseEntity<List<MetodoPago>> listarActivos() {
+        return ResponseEntity.ok(metodoPagoService.listarActivos());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MetodoPago> buscarPorId(@PathVariable Long id) {
-        return metodoPagoService.buscarPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(metodoPagoService.buscarPorId(id));
     }
 
     @PostMapping
     public ResponseEntity<MetodoPago> guardar(@RequestBody MetodoPago metodoPago) {
         return ResponseEntity.ok(metodoPagoService.guardar(metodoPago));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<MetodoPago> actualizar(@PathVariable Long id, @RequestBody MetodoPago metodoPago) {
+        return ResponseEntity.ok(metodoPagoService.actualizar(id, metodoPago));
     }
 
     @DeleteMapping("/{id}")

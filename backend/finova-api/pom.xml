@@ -69,6 +69,35 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		
+		<!-- Jackson Databind: convierte objetos Java a JSON y viceversa.
+     Spring Boot normalmente la incluye con spring-boot-starter-web,
+     pero si no está, hay que declararla explícitamente. -->
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+</dependency>
+
+<!-- WebFlux: necesario para usar WebClient (que es el que llama a Gemini).
+     WebClient es la versión reactiva de RestTemplate. -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+		
+		
+		<!-- WebClient para llamar a la API de Gemini -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+		
+		<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <scope>runtime</scope>
+</dependency>
+		
 	</dependencies>
 
 	<build>

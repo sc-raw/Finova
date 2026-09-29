@@ -20,16 +20,24 @@ public class BancoController {
         return ResponseEntity.ok(bancoService.listarBancos());
     }
 
+    @GetMapping("/activos")
+    public ResponseEntity<List<Banco>> listarActivos() {
+        return ResponseEntity.ok(bancoService.listarActivos());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Banco> buscarPorId(@PathVariable Long id) {
-        return bancoService.buscarPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(bancoService.buscarPorId(id));
     }
 
     @PostMapping
     public ResponseEntity<Banco> guardar(@RequestBody Banco banco) {
         return ResponseEntity.ok(bancoService.guardar(banco));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Banco> actualizar(@PathVariable Long id, @RequestBody Banco banco) {
+        return ResponseEntity.ok(bancoService.actualizar(id, banco));
     }
 
     @DeleteMapping("/{id}")
