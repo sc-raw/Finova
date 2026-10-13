@@ -9,11 +9,26 @@ sealed class Screen(val route: String) {
     object MisCuentas : Screen("mis_cuentas")
     object Transferir : Screen("transferir")
     object Historial : Screen("historial")
+    object DetalleMovimiento : Screen("detalle_movimiento")
     object Estadisticas : Screen("estadisticas")
     object Perfil : Screen("perfil")
+    object MisDatos : Screen("mis_datos")
     object Escanear : Screen("escanear")
 
     companion object {
-        val values = listOf(Splash,Login, Registro, Dashboard, MisCuentas, Transferir, Historial, Estadisticas, Perfil, Escanear)
+        val values = listOf(
+            Splash,
+            Login,
+            Registro,
+            Dashboard,
+            MisCuentas,
+            Transferir,
+            Historial,
+            DetalleMovimiento,
+            Estadisticas,
+            Perfil,
+            MisDatos,
+            Escanear
+        )
     }
 }
