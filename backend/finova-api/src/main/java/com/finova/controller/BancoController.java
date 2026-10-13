@@ -1,8 +1,12 @@
+
 package com.finova.controller;
 
 import com.finova.entity.Banco;
 import com.finova.service.BancoService;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,22 +30,31 @@ public class BancoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Banco> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<Banco> buscarPorId(
+            @PathVariable Long id) {
         return ResponseEntity.ok(bancoService.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<Banco> guardar(@RequestBody Banco banco) {
-        return ResponseEntity.ok(bancoService.guardar(banco));
+    public ResponseEntity<Banco> guardar(
+            @RequestBody Banco banco) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(bancoService.guardar(banco));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Banco> actualizar(@PathVariable Long id, @RequestBody Banco banco) {
-        return ResponseEntity.ok(bancoService.actualizar(id, banco));
+    public ResponseEntity<Banco> actualizar(
+            @PathVariable Long id,
+            @RequestBody Banco banco) {
+        return ResponseEntity.ok(
+                bancoService.actualizar(id, banco)
+        );
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+    public ResponseEntity<Void> eliminar(
+            @PathVariable Long id) {
         bancoService.eliminar(id);
         return ResponseEntity.noContent().build();
     }

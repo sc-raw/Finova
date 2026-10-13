@@ -1,16 +1,20 @@
+
 package com.finova.controller;
 
 import com.finova.dto.MetaResponseDTO;
 import com.finova.entity.Meta;
+import com.finova.exception.ReglaNegocioException;
 import com.finova.service.MetaService;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/metas")
@@ -21,11 +25,10 @@ public class MetaController {
 
     @GetMapping
     public ResponseEntity<List<MetaResponseDTO>> listarMetas() {
-
         List<MetaResponseDTO> lista = metaService.listarMetas()
                 .stream()
                 .map(MetaResponseDTO::desdeEntidad)
-                .collect(Collectors.toList());
+                .toList();
 
         return ResponseEntity.ok(lista);
     }
@@ -34,10 +37,11 @@ public class MetaController {
     public ResponseEntity<List<MetaResponseDTO>> listarPorUsuario(
             @PathVariable Long usuarioId) {
 
-        List<MetaResponseDTO> lista = metaService.listarPorUsuario(usuarioId)
+        List<MetaResponseDTO> lista = metaService
+                .listarPorUsuario(usuarioId)
                 .stream()
                 .map(MetaResponseDTO::desdeEntidad)
-                .collect(Collectors.toList());
+                .toList();
 
         return ResponseEntity.ok(lista);
     }
@@ -63,21 +67,25 @@ public class MetaController {
     }
 
     @PostMapping
-    public ResponseEntity<Meta> guardar(
+    public ResponseEntity<MetaResponseDTO> guardar(
             @RequestBody Meta meta) {
 
-        return ResponseEntity.ok(
-                metaService.guardar(meta)
-        );
+        Meta guardada = metaService.guardar(meta);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(MetaResponseDTO.desdeEntidad(guardada));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Meta> actualizar(
+    public ResponseEntity<MetaResponseDTO> actualizar(
             @PathVariable Long id,
             @RequestBody Meta meta) {
 
+        Meta actualizada = metaService.actualizar(id, meta);
+
         return ResponseEntity.ok(
-                metaService.actualizar(id, meta)
+                MetaResponseDTO.desdeEntidad(actualizada)
         );
     }
 
@@ -95,7 +103,7 @@ public class MetaController {
             @PathVariable Long id,
             @RequestBody Map<String, BigDecimal> body) {
 
-        metaService.aportar(id, body.get("monto"));
+        metaService.aportar(id, obtenerMonto(body));
 
         return ResponseEntity.noContent().build();
     }
@@ -105,8 +113,18 @@ public class MetaController {
             @PathVariable Long id,
             @RequestBody Map<String, BigDecimal> body) {
 
-        metaService.retirar(id, body.get("monto"));
+        metaService.retirar(id, obtenerMonto(body));
 
         return ResponseEntity.noContent().build();
+    }
+
+    private BigDecimal obtenerMonto(Map<String, BigDecimal> body) {
+        if (body == null || body.get("monto") == null) {
+            throw new ReglaNegocioException(
+                    "El campo 'monto' es obligatorio"
+            );
+        }
+
+        return body.get("monto");
     }
 }

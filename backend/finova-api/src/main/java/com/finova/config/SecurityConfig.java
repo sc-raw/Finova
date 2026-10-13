@@ -18,30 +18,27 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
+
         http
-            // 1. Deshabilitar CSRF (no usamos formularios HTML)
-            .csrf(AbstractHttpConfigurer::disable)
-
-            // 2. Deshabilitar el formulario de login por defecto
-            .formLogin(AbstractHttpConfigurer::disable)
-
-            // 3. Deshabilitar HTTP Basic (usuario/contraseña en cada request)
-            .httpBasic(AbstractHttpConfigurer::disable)
-
-            // 4. Configurar CORS para permitir peticiones desde el frontend
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-            // 5. Sin sesiones (API REST, cada request es independiente)
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-
-            // 6. Permitir todos los endpoints de /api/**
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").permitAll()
-                .anyRequest().authenticated()
-            );
+                .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(
+                        corsConfigurationSource()
+                ))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/usuarios", "/api/usuarios/login")
+                        .permitAll()
+                        .requestMatchers("/api/**").permitAll()
+                        .anyRequest().authenticated()
+                );
 
         return http.build();
     }
@@ -54,13 +51,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+        ));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", config);
+
         return source;
     }
 }

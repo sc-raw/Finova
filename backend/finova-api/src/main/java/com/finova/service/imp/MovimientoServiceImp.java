@@ -46,8 +46,21 @@ public class MovimientoServiceImp implements MovimientoService {
     @Override
     @Transactional(readOnly = true)
     public List<Movimiento> listarMovimientos() {
+        return movimientoRepository.findAll()
+                .stream()
+                .sorted((a, b) -> {
+                    if (a.getFechaMovimiento() == null) {
+                        return b.getFechaMovimiento() == null ? 0 : 1;
+                    }
 
-        return movimientoRepository.findAll();
+                    if (b.getFechaMovimiento() == null) {
+                        return -1;
+                    }
+
+                    return b.getFechaMovimiento()
+                            .compareTo(a.getFechaMovimiento());
+                })
+                .toList();
     }
 
 
@@ -58,9 +71,46 @@ public class MovimientoServiceImp implements MovimientoService {
     @Override
     @Transactional(readOnly = true)
     public List<Movimiento> listarPorUsuario(Long usuarioId) {
+        if (usuarioId == null || usuarioId <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID del usuario debe ser válido"
+            );
+        }
 
-        return movimientoRepository
-                .findByCuentaOrigenUsuarioIdOrderByFechaMovimientoDesc(usuarioId);
+        return movimientoRepository.findAll()
+                .stream()
+                .filter(movimiento -> {
+                    boolean cuentaOrigenPertenece =
+                            movimiento.getCuentaOrigen() != null
+                            && movimiento.getCuentaOrigen().getUsuario() != null
+                            && usuarioId.equals(
+                                    movimiento.getCuentaOrigen()
+                                            .getUsuario().getId()
+                            );
+
+                    boolean cuentaDestinoPertenece =
+                            movimiento.getCuentaDestino() != null
+                            && movimiento.getCuentaDestino().getUsuario() != null
+                            && usuarioId.equals(
+                                    movimiento.getCuentaDestino()
+                                            .getUsuario().getId()
+                            );
+
+                    return cuentaOrigenPertenece || cuentaDestinoPertenece;
+                })
+                .sorted((a, b) -> {
+                    if (a.getFechaMovimiento() == null) {
+                        return b.getFechaMovimiento() == null ? 0 : 1;
+                    }
+
+                    if (b.getFechaMovimiento() == null) {
+                        return -1;
+                    }
+
+                    return b.getFechaMovimiento()
+                            .compareTo(a.getFechaMovimiento());
+                })
+                .toList();
     }
 
 
@@ -71,6 +121,11 @@ public class MovimientoServiceImp implements MovimientoService {
     @Override
     @Transactional(readOnly = true)
     public Movimiento buscarPorId(Long id) {
+        if (id == null || id <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID del movimiento debe ser válido"
+            );
+        }
 
         return movimientoRepository.findById(id)
                 .orElseThrow(() ->
@@ -80,13 +135,31 @@ public class MovimientoServiceImp implements MovimientoService {
                 );
     }
 
-
     // =========================================================
     // GUARDAR
     // =========================================================
 
     @Override
     public Movimiento guardar(Movimiento movimiento) {
+        if (movimiento == null) {
+            throw new ReglaNegocioException(
+                    "El movimiento es obligatorio"
+            );
+        }
+
+        if (movimiento.getTipoMovimiento() == null) {
+            throw new ReglaNegocioException(
+                    "El tipo de movimiento es obligatorio"
+            );
+        }
+
+        validarMonto(movimiento.getMonto());
+
+        if (movimiento.getFechaMovimiento() == null) {
+            movimiento.setFechaMovimiento(LocalDateTime.now());
+        }
+
+        aplicarMovimiento(movimiento);
 
         return movimientoRepository.save(movimiento);
     }
@@ -98,134 +171,108 @@ public class MovimientoServiceImp implements MovimientoService {
 
     @Override
     public Movimiento actualizar(Long id, Movimiento movimiento) {
+        if (movimiento == null) {
+            throw new ReglaNegocioException("El movimiento es obligatorio");
+        }
 
         Movimiento existente = buscarPorId(id);
 
-        // Revertir el efecto financiero anterior
-        revertirMovimiento(existente);
-
-
-        // Validar categoría
-        if (movimiento.getCategoria() == null
-                || movimiento.getCategoria().getId() == null) {
-
-            throw new ReglaNegocioException(
-                    "La categoría es obligatoria"
-            );
-        }
-
-        Categoria categoria = categoriaRepository.findById(
-                movimiento.getCategoria().getId()
-        ).orElseThrow(() ->
-                new RecursoNoEncontradoException(
-                        "Categoría no encontrada con ID: "
-                                + movimiento.getCategoria().getId()
-                )
-        );
-
-
-        // Validar método de pago
-        MetodoPago metodoPago = null;
-
-        if (movimiento.getMetodoPago() != null
-                && movimiento.getMetodoPago().getId() != null) {
-
-            metodoPago = metodoPagoRepository.findById(
-                    movimiento.getMetodoPago().getId()
-            ).orElseThrow(() ->
-                    new RecursoNoEncontradoException(
-                            "Método de pago no encontrado con ID: "
-                                    + movimiento.getMetodoPago().getId()
-                    )
-            );
-        }
-
-
-        // Validar monto
-        validarMonto(movimiento.getMonto());
-
-
-        // Validar tipo
         if (movimiento.getTipoMovimiento() == null) {
-
             throw new ReglaNegocioException(
                     "El tipo de movimiento es obligatorio"
             );
         }
 
+        validarMonto(movimiento.getMonto());
 
-        // Actualizar datos
-        existente.setDescripcion(
-                movimiento.getDescripcion()
-        );
+        Categoria categoria = null;
 
-        existente.setFechaMovimiento(
-                movimiento.getFechaMovimiento()
-        );
+        if (movimiento.getCategoria() != null
+                && movimiento.getCategoria().getId() != null) {
+            categoria = categoriaRepository.findById(
+                    movimiento.getCategoria().getId()
+            ).orElseThrow(() ->
+                    new RecursoNoEncontradoException(
+                            "Categoría no encontrada"
+                    )
+            );
+        }
 
-        existente.setCategoria(
-                categoria
-        );
-
-        existente.setMetodoPago(
-                metodoPago
-        );
-
-        existente.setMonto(
-                movimiento.getMonto()
-        );
-
-        existente.setTipoMovimiento(
+        validarCategoriaParaMovimiento(
+                categoria,
                 movimiento.getTipoMovimiento()
         );
 
+        MetodoPago metodoPago = null;
+
+        if (movimiento.getMetodoPago() != null
+                && movimiento.getMetodoPago().getId() != null) {
+            metodoPago = metodoPagoRepository.findById(
+                    movimiento.getMetodoPago().getId()
+            ).orElseThrow(() ->
+                    new RecursoNoEncontradoException(
+                            "Método de pago no encontrado"
+                    )
+            );
+        }
+
+        revertirMovimiento(existente);
+
+        existente.setDescripcion(movimiento.getDescripcion());
+        existente.setFechaMovimiento(
+                movimiento.getFechaMovimiento() != null
+                        ? movimiento.getFechaMovimiento()
+                        : LocalDateTime.now()
+        );
+        existente.setCategoria(categoria);
+        existente.setMetodoPago(metodoPago);
+        existente.setMonto(movimiento.getMonto());
+        existente.setTipoMovimiento(movimiento.getTipoMovimiento());
+
         existente.setCuentaOrigen(
-                movimiento.getCuentaOrigen()
+                movimiento.getCuentaOrigen() != null
+                        && movimiento.getCuentaOrigen().getId() != null
+                        ? obtenerCuenta(movimiento.getCuentaOrigen())
+                        : null
         );
 
         existente.setCuentaDestino(
-                movimiento.getCuentaDestino()
+                movimiento.getCuentaDestino() != null
+                        && movimiento.getCuentaDestino().getId() != null
+                        ? obtenerCuenta(movimiento.getCuentaDestino())
+                        : null
         );
 
         existente.setMeta(
-                movimiento.getMeta()
+                movimiento.getMeta() != null
+                        && movimiento.getMeta().getId() != null
+                        ? obtenerMeta(movimiento.getMeta())
+                        : null
         );
 
-
-        // Aplicar nuevamente el efecto financiero
         aplicarMovimiento(existente);
-
 
         return movimientoRepository.save(existente);
     }
-
 
     // =========================================================
     // ELIMINAR
     // =========================================================
 
     @Override
+    @Transactional
     public void eliminar(Long id) {
-
         Movimiento movimiento = buscarPorId(id);
 
-
-        // Buscar comprobante asociado
         Comprobante comprobante =
                 comprobanteRepository.findByMovimientoId(id);
 
+        revertirMovimiento(movimiento);
 
-        // Eliminar primero el comprobante
         if (comprobante != null) {
             comprobanteRepository.delete(comprobante);
         }
 
-
-        // Revertir el efecto financiero
-        revertirMovimiento(movimiento);
-
-
-        // Eliminar finalmente el movimiento
         movimientoRepository.delete(movimiento);
     }
 
@@ -250,43 +297,33 @@ public class MovimientoServiceImp implements MovimientoService {
                 );
 
         Categoria categoria = categoriaRepository.findById(categoriaId)
-                .orElseThrow(() -> new ReglaNegocioException("Categoría no encontrada"));
-
-        validarCategoriaParaMovimiento(categoria, TipoMovimiento.GASTO);
+                .orElseThrow(() ->
+                        new RecursoNoEncontradoException(
+                                "Categoría no encontrada con ID: " + categoriaId
+                        )
+                );
 
         MetodoPago metodoPago = metodoPagoRepository.findById(metodoPagoId)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
-                                "Método de pago no encontrado con ID: "
-                                        + metodoPagoId
+                                "Método de pago no encontrado con ID: " + metodoPagoId
                         )
                 );
 
-
         validarMonto(monto);
-
+        validarCategoriaParaMovimiento(categoria, TipoMovimiento.GASTO);
         validarSaldo(cuenta, monto);
 
-
-        cuenta.setSaldoActual(
-                cuenta.getSaldoActual().subtract(monto)
-        );
-
+        cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
 
         Movimiento movimiento = new Movimiento();
-
         movimiento.setCuentaOrigen(cuenta);
         movimiento.setCategoria(categoria);
         movimiento.setMetodoPago(metodoPago);
         movimiento.setMonto(monto);
         movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(
-                TipoMovimiento.GASTO
-        );
-        movimiento.setFechaMovimiento(
-                LocalDateTime.now()
-        );
-
+        movimiento.setTipoMovimiento(TipoMovimiento.GASTO);
+        movimiento.setFechaMovimiento(LocalDateTime.now());
 
         cuentaRepository.save(cuenta);
         movimientoRepository.save(movimiento);
@@ -319,39 +356,26 @@ public class MovimientoServiceImp implements MovimientoService {
                         )
                 );
 
-        validarCategoriaParaMovimiento(categoria, TipoMovimiento.INGRESO);
-
         MetodoPago metodoPago = metodoPagoRepository.findById(metodoPagoId)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
-                                "Método de pago no encontrado con ID: "
-                                        + metodoPagoId
+                                "Método de pago no encontrado con ID: " + metodoPagoId
                         )
                 );
 
-
         validarMonto(monto);
+        validarCategoriaParaMovimiento(categoria, TipoMovimiento.INGRESO);
 
-
-        cuenta.setSaldoActual(
-                cuenta.getSaldoActual().add(monto)
-        );
-
+        cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
 
         Movimiento movimiento = new Movimiento();
-
         movimiento.setCuentaDestino(cuenta);
         movimiento.setCategoria(categoria);
         movimiento.setMetodoPago(metodoPago);
         movimiento.setMonto(monto);
         movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(
-                TipoMovimiento.INGRESO
-        );
-        movimiento.setFechaMovimiento(
-                LocalDateTime.now()
-        );
-
+        movimiento.setTipoMovimiento(TipoMovimiento.INGRESO);
+        movimiento.setFechaMovimiento(LocalDateTime.now());
 
         cuentaRepository.save(cuenta);
         movimientoRepository.save(movimiento);
@@ -363,63 +387,53 @@ public class MovimientoServiceImp implements MovimientoService {
     // =========================================================
 
     @Override
+    @Transactional
     public void transferir(
             Long cuentaOrigenId,
             Long cuentaDestinoId,
             BigDecimal monto,
             String descripcion) {
 
+        if (cuentaOrigenId == null || cuentaDestinoId == null) {
+            throw new ReglaNegocioException(
+                    "Las cuentas de origen y destino son obligatorias"
+            );
+        }
+
+        if (cuentaOrigenId.equals(cuentaDestinoId)) {
+            throw new ReglaNegocioException(
+                    "Las cuentas deben ser diferentes"
+            );
+        }
+
+        validarMonto(monto);
+
         Cuenta origen = cuentaRepository.findById(cuentaOrigenId)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
-                                "Cuenta origen no encontrada"
+                                "Cuenta de origen no encontrada"
                         )
                 );
 
         Cuenta destino = cuentaRepository.findById(cuentaDestinoId)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
-                                "Cuenta destino no encontrada"
+                                "Cuenta de destino no encontrada"
                         )
                 );
 
-
-        validarMonto(monto);
-
-
-        if (origen.getId().equals(destino.getId())) {
-
-        	throw new ReglaNegocioException(
-        	        "La categoría seleccionada no corresponde a un movimiento de INGRESO"
-        	);
-        }
-
-
         validarSaldo(origen, monto);
 
-
-        origen.setSaldoActual(
-                origen.getSaldoActual().subtract(monto)
-        );
-
-        destino.setSaldoActual(
-                destino.getSaldoActual().add(monto)
-        );
-
+        origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
+        destino.setSaldoActual(destino.getSaldoActual().add(monto));
 
         Movimiento movimiento = new Movimiento();
-
         movimiento.setCuentaOrigen(origen);
         movimiento.setCuentaDestino(destino);
         movimiento.setMonto(monto);
         movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(
-                TipoMovimiento.TRANSFERENCIA
-        );
-        movimiento.setFechaMovimiento(
-                LocalDateTime.now()
-        );
-
+        movimiento.setTipoMovimiento(TipoMovimiento.TRANSFERENCIA);
+        movimiento.setFechaMovimiento(LocalDateTime.now());
 
         cuentaRepository.save(origen);
         cuentaRepository.save(destino);
@@ -432,6 +446,7 @@ public class MovimientoServiceImp implements MovimientoService {
     // =========================================================
 
     @Override
+    @Transactional
     public void aportarMeta(
             Long cuentaId,
             Long metaId,
@@ -452,48 +467,27 @@ public class MovimientoServiceImp implements MovimientoService {
                         )
                 );
 
-
         validarMonto(monto);
-
         validarSaldo(cuenta, monto);
 
+        BigDecimal nuevoMonto = meta.getMontoActual().add(monto);
 
-        BigDecimal nuevoMonto = meta.getMontoActual()
-                .add(monto);
-
-
-        if (nuevoMonto.compareTo(
-                meta.getMontoObjetivo()
-        ) > 0) {
-
+        if (nuevoMonto.compareTo(meta.getMontoObjetivo()) > 0) {
             throw new ReglaNegocioException(
                     "El aporte supera el monto objetivo de la meta"
             );
         }
 
-
-        cuenta.setSaldoActual(
-                cuenta.getSaldoActual().subtract(monto)
-        );
-
-        meta.setMontoActual(
-                nuevoMonto
-        );
-
+        cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
+        meta.setMontoActual(nuevoMonto);
 
         Movimiento movimiento = new Movimiento();
-
         movimiento.setCuentaOrigen(cuenta);
         movimiento.setMeta(meta);
         movimiento.setMonto(monto);
         movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(
-                TipoMovimiento.APORTE_META
-        );
-        movimiento.setFechaMovimiento(
-                LocalDateTime.now()
-        );
-
+        movimiento.setTipoMovimiento(TipoMovimiento.APORTE_META);
+        movimiento.setFechaMovimiento(LocalDateTime.now());
 
         cuentaRepository.save(cuenta);
         metaRepository.save(meta);
@@ -511,13 +505,30 @@ public class MovimientoServiceImp implements MovimientoService {
             String tipo,
             Long usuarioId) {
 
-        return movimientoRepository
-                .findByTipoMovimientoAndCuentaOrigenUsuarioId(
-                        TipoMovimiento.valueOf(
-                                tipo.toUpperCase()
-                        ),
-                        usuarioId
-                );
+        if (tipo == null || tipo.isBlank()) {
+            throw new ReglaNegocioException(
+                    "El tipo de movimiento es obligatorio"
+            );
+        }
+
+        TipoMovimiento tipoMovimiento;
+
+        try {
+            tipoMovimiento = TipoMovimiento.valueOf(
+                    tipo.trim().toUpperCase()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new ReglaNegocioException(
+                    "Tipo de movimiento no válido: " + tipo
+            );
+        }
+
+        return listarPorUsuario(usuarioId)
+                .stream()
+                .filter(movimiento ->
+                        movimiento.getTipoMovimiento() == tipoMovimiento
+                )
+                .toList();
     }
 
 
@@ -528,11 +539,38 @@ public class MovimientoServiceImp implements MovimientoService {
     @Override
     @Transactional(readOnly = true)
     public List<Movimiento> listarPorCuenta(Long cuentaId) {
+        if (cuentaId == null || cuentaId <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID de la cuenta debe ser válido"
+            );
+        }
 
-        return movimientoRepository
-                .findByCuentaOrigenIdOrderByFechaMovimientoDesc(
-                        cuentaId
-                );
+        return movimientoRepository.findAll()
+                .stream()
+                .filter(movimiento ->
+                        (movimiento.getCuentaOrigen() != null
+                                && cuentaId.equals(
+                                        movimiento.getCuentaOrigen().getId()
+                                ))
+                        ||
+                        (movimiento.getCuentaDestino() != null
+                                && cuentaId.equals(
+                                        movimiento.getCuentaDestino().getId()
+                                ))
+                )
+                .sorted((a, b) -> {
+                    if (a.getFechaMovimiento() == null) {
+                        return b.getFechaMovimiento() == null ? 0 : 1;
+                    }
+
+                    if (b.getFechaMovimiento() == null) {
+                        return -1;
+                    }
+
+                    return b.getFechaMovimiento()
+                            .compareTo(a.getFechaMovimiento());
+                })
+                .toList();
     }
 
 
@@ -540,178 +578,91 @@ public class MovimientoServiceImp implements MovimientoService {
     // REVERTIR MOVIMIENTO
     // =========================================================
 
-    private void revertirMovimiento(
-            Movimiento movimiento) {
+    private void revertirMovimiento(Movimiento movimiento) {
+        if (movimiento == null) {
+            throw new ReglaNegocioException(
+                    "El movimiento es obligatorio"
+            );
+        }
 
         BigDecimal monto = movimiento.getMonto();
-
+        validarMonto(monto);
 
         switch (movimiento.getTipoMovimiento()) {
-
             case GASTO -> {
-
-                Cuenta cuenta =
-                        movimiento.getCuentaOrigen();
-
-                if (cuenta != null) {
-
-                    cuenta.setSaldoActual(
-                            cuenta.getSaldoActual().add(monto)
-                    );
-
-                    cuentaRepository.save(cuenta);
-                }
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaOrigen());
+                cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
+                cuentaRepository.save(cuenta);
             }
-
 
             case INGRESO -> {
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaDestino());
 
-                Cuenta cuenta =
-                        movimiento.getCuentaDestino();
-
-                if (cuenta != null) {
-
-                    if (cuenta.getSaldoActual()
-                            .compareTo(monto) < 0) {
-
-                        throw new ReglaNegocioException(
-                                "No se puede revertir el ingreso "
-                                        + "porque el saldo actual "
-                                        + "es insuficiente"
-                        );
-                    }
-
-
-                    cuenta.setSaldoActual(
-                            cuenta.getSaldoActual().subtract(monto)
+                if (cuenta.getSaldoActual().compareTo(monto) < 0) {
+                    throw new ReglaNegocioException(
+                            "No se puede revertir el ingreso porque el saldo es insuficiente"
                     );
-
-                    cuentaRepository.save(cuenta);
                 }
-            }
 
+                cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
+                cuentaRepository.save(cuenta);
+            }
 
             case TRANSFERENCIA -> {
+                Cuenta origen = obtenerCuenta(movimiento.getCuentaOrigen());
+                Cuenta destino = obtenerCuenta(movimiento.getCuentaDestino());
 
-                Cuenta origen =
-                        movimiento.getCuentaOrigen();
-
-                Cuenta destino =
-                        movimiento.getCuentaDestino();
-
-
-                if (origen != null) {
-
-                    origen.setSaldoActual(
-                            origen.getSaldoActual().add(monto)
+                if (origen.getId().equals(destino.getId())) {
+                    throw new ReglaNegocioException(
+                            "Las cuentas de origen y destino deben ser diferentes"
                     );
-
-                    cuentaRepository.save(origen);
                 }
 
-
-                if (destino != null) {
-
-                    if (destino.getSaldoActual()
-                            .compareTo(monto) < 0) {
-
-                        throw new ReglaNegocioException(
-                                "No se puede revertir la transferencia "
-                                        + "porque el saldo destino "
-                                        + "es insuficiente"
-                        );
-                    }
-
-
-                    destino.setSaldoActual(
-                            destino.getSaldoActual().subtract(monto)
+                if (destino.getSaldoActual().compareTo(monto) < 0) {
+                    throw new ReglaNegocioException(
+                            "No se puede revertir la transferencia porque el saldo destino es insuficiente"
                     );
-
-                    cuentaRepository.save(destino);
                 }
+
+                origen.setSaldoActual(origen.getSaldoActual().add(monto));
+                destino.setSaldoActual(destino.getSaldoActual().subtract(monto));
+
+                cuentaRepository.save(origen);
+                cuentaRepository.save(destino);
             }
-
 
             case APORTE_META -> {
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaOrigen());
+                Meta meta = obtenerMeta(movimiento.getMeta());
 
-                Cuenta cuenta =
-                        movimiento.getCuentaOrigen();
-
-                Meta meta =
-                        movimiento.getMeta();
-
-
-                if (cuenta != null) {
-
-                    cuenta.setSaldoActual(
-                            cuenta.getSaldoActual().add(monto)
+                if (meta.getMontoActual().compareTo(monto) < 0) {
+                    throw new ReglaNegocioException(
+                            "No se puede revertir el aporte porque el saldo de la meta es insuficiente"
                     );
-
-                    cuentaRepository.save(cuenta);
                 }
 
+                cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
+                meta.setMontoActual(meta.getMontoActual().subtract(monto));
 
-                if (meta != null) {
-
-                    BigDecimal nuevoMonto =
-                            meta.getMontoActual().subtract(monto);
-
-
-                    if (nuevoMonto.compareTo(
-                            BigDecimal.ZERO
-                    ) < 0) {
-
-                        nuevoMonto = BigDecimal.ZERO;
-                    }
-
-
-                    meta.setMontoActual(
-                            nuevoMonto
-                    );
-
-                    metaRepository.save(meta);
-                }
+                cuentaRepository.save(cuenta);
+                metaRepository.save(meta);
             }
 
-
             case RETIRO_META -> {
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaDestino());
+                Meta meta = obtenerMeta(movimiento.getMeta());
 
-                Cuenta cuenta =
-                        movimiento.getCuentaDestino();
-
-                Meta meta =
-                        movimiento.getMeta();
-
-
-                if (cuenta != null) {
-
-                    if (cuenta.getSaldoActual()
-                            .compareTo(monto) < 0) {
-
-                        throw new ReglaNegocioException(
-                                "No se puede revertir el retiro "
-                                        + "de la meta porque el saldo "
-                                        + "es insuficiente"
-                        );
-                    }
-
-
-                    cuenta.setSaldoActual(
-                            cuenta.getSaldoActual().subtract(monto)
+                if (cuenta.getSaldoActual().compareTo(monto) < 0) {
+                    throw new ReglaNegocioException(
+                            "No se puede revertir el retiro porque el saldo de la cuenta es insuficiente"
                     );
-
-                    cuentaRepository.save(cuenta);
                 }
 
+                cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
+                meta.setMontoActual(meta.getMontoActual().add(monto));
 
-                if (meta != null) {
-
-                    meta.setMontoActual(
-                            meta.getMontoActual().add(monto)
-                    );
-
-                    metaRepository.save(meta);
-                }
+                cuentaRepository.save(cuenta);
+                metaRepository.save(meta);
             }
         }
     }
@@ -721,185 +672,132 @@ public class MovimientoServiceImp implements MovimientoService {
     // APLICAR MOVIMIENTO
     // =========================================================
 
-    private void aplicarMovimiento(
-            Movimiento movimiento) {
+    private void aplicarMovimiento(Movimiento movimiento) {
+        if (movimiento == null) {
+            throw new ReglaNegocioException(
+                    "El movimiento es obligatorio"
+            );
+        }
 
-        BigDecimal monto =
-                movimiento.getMonto();
+        if (movimiento.getTipoMovimiento() == null) {
+            throw new ReglaNegocioException(
+                    "El tipo de movimiento es obligatorio"
+            );
+        }
 
+        BigDecimal monto = movimiento.getMonto();
         validarMonto(monto);
 
-
         switch (movimiento.getTipoMovimiento()) {
-
             case GASTO -> {
-
-                Cuenta cuenta =
-                        obtenerCuenta(
-                                movimiento.getCuentaOrigen()
-                        );
-
-                validarSaldo(cuenta, monto);
-
-
-                cuenta.setSaldoActual(
-                        cuenta.getSaldoActual().subtract(monto)
+                Categoria categoria = movimiento.getCategoria();
+                validarCategoriaParaMovimiento(
+                        categoria != null && categoria.getId() != null
+                                ? categoriaRepository.findById(categoria.getId())
+                                        .orElseThrow(() ->
+                                                new RecursoNoEncontradoException(
+                                                        "Categoría no encontrada"
+                                                ))
+                                : null,
+                        TipoMovimiento.GASTO
                 );
 
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaOrigen());
+                validarSaldo(cuenta, monto);
 
+                cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
                 cuentaRepository.save(cuenta);
-
                 movimiento.setCuentaOrigen(cuenta);
             }
 
-
             case INGRESO -> {
-
-                Cuenta cuenta =
-                        obtenerCuenta(
-                                movimiento.getCuentaDestino()
-                        );
-
-
-                cuenta.setSaldoActual(
-                        cuenta.getSaldoActual().add(monto)
+                Categoria categoria = movimiento.getCategoria();
+                validarCategoriaParaMovimiento(
+                        categoria != null && categoria.getId() != null
+                                ? categoriaRepository.findById(categoria.getId())
+                                        .orElseThrow(() ->
+                                                new RecursoNoEncontradoException(
+                                                        "Categoría no encontrada"
+                                                ))
+                                : null,
+                        TipoMovimiento.INGRESO
                 );
 
-
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaDestino());
+                cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
                 cuentaRepository.save(cuenta);
-
                 movimiento.setCuentaDestino(cuenta);
             }
 
-
             case TRANSFERENCIA -> {
+                Cuenta origen = obtenerCuenta(movimiento.getCuentaOrigen());
+                Cuenta destino = obtenerCuenta(movimiento.getCuentaDestino());
 
-                Cuenta origen =
-                        obtenerCuenta(
-                                movimiento.getCuentaOrigen()
-                        );
-
-                Cuenta destino =
-                        obtenerCuenta(
-                                movimiento.getCuentaDestino()
-                        );
-
-
-                if (origen.getId().equals(
-                        destino.getId()
-                )) {
-
+                if (origen.getId().equals(destino.getId())) {
                     throw new ReglaNegocioException(
-                            "La cuenta origen y destino "
-                                    + "no pueden ser la misma"
+                            "Las cuentas de origen y destino deben ser diferentes"
                     );
                 }
 
-
                 validarSaldo(origen, monto);
 
-
-                origen.setSaldoActual(
-                        origen.getSaldoActual().subtract(monto)
-                );
-
-                destino.setSaldoActual(
-                        destino.getSaldoActual().add(monto)
-                );
-
+                origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
+                destino.setSaldoActual(destino.getSaldoActual().add(monto));
 
                 cuentaRepository.save(origen);
                 cuentaRepository.save(destino);
-
 
                 movimiento.setCuentaOrigen(origen);
                 movimiento.setCuentaDestino(destino);
             }
 
-
             case APORTE_META -> {
-
-                Cuenta cuenta =
-                        obtenerCuenta(
-                                movimiento.getCuentaOrigen()
-                        );
-
-                Meta meta =
-                        obtenerMeta(
-                                movimiento.getMeta()
-                        );
-
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaOrigen());
+                Meta meta = obtenerMeta(movimiento.getMeta());
 
                 validarSaldo(cuenta, monto);
 
-
-                BigDecimal nuevoMonto =
-                        meta.getMontoActual().add(monto);
-
-
-                if (nuevoMonto.compareTo(
-                        meta.getMontoObjetivo()
-                ) > 0) {
-
+                if (meta.getMontoActual() == null
+                        || meta.getMontoObjetivo() == null) {
                     throw new ReglaNegocioException(
-                            "El aporte supera el monto objetivo "
-                                    + "de la meta"
+                            "La meta no tiene sus montos correctamente configurados"
                     );
                 }
 
+                BigDecimal nuevoMonto = meta.getMontoActual().add(monto);
 
-                cuenta.setSaldoActual(
-                        cuenta.getSaldoActual().subtract(monto)
-                );
+                if (nuevoMonto.compareTo(meta.getMontoObjetivo()) > 0) {
+                    throw new ReglaNegocioException(
+                            "El aporte supera el monto objetivo de la meta"
+                    );
+                }
 
-                meta.setMontoActual(
-                        nuevoMonto
-                );
-
+                cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
+                meta.setMontoActual(nuevoMonto);
 
                 cuentaRepository.save(cuenta);
                 metaRepository.save(meta);
-
 
                 movimiento.setCuentaOrigen(cuenta);
                 movimiento.setMeta(meta);
             }
 
-
             case RETIRO_META -> {
+                Meta meta = obtenerMeta(movimiento.getMeta());
+                Cuenta cuenta = obtenerCuenta(movimiento.getCuentaDestino());
 
-                Meta meta =
-                        obtenerMeta(
-                                movimiento.getMeta()
-                        );
-
-                Cuenta cuenta =
-                        obtenerCuenta(
-                                movimiento.getCuentaDestino()
-                        );
-
-
-                if (meta.getMontoActual()
-                        .compareTo(monto) < 0) {
-
+                if (meta.getMontoActual() == null
+                        || meta.getMontoActual().compareTo(monto) < 0) {
                     throw new ReglaNegocioException(
                             "La meta no tiene saldo suficiente"
                     );
                 }
 
-
-                meta.setMontoActual(
-                        meta.getMontoActual().subtract(monto)
-                );
-
-                cuenta.setSaldoActual(
-                        cuenta.getSaldoActual().add(monto)
-                );
-
+                meta.setMontoActual(meta.getMontoActual().subtract(monto));
+                cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
 
                 metaRepository.save(meta);
                 cuentaRepository.save(cuenta);
-
 
                 movimiento.setMeta(meta);
                 movimiento.setCuentaDestino(cuenta);
@@ -913,24 +811,25 @@ public class MovimientoServiceImp implements MovimientoService {
     // =========================================================
 
     private Cuenta obtenerCuenta(Cuenta cuenta) {
-
-        if (cuenta == null
-                || cuenta.getId() == null) {
-
+        if (cuenta == null || cuenta.getId() == null) {
             throw new ReglaNegocioException(
                     "La cuenta es obligatoria"
             );
         }
 
+        if (cuenta.getId() <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID de la cuenta debe ser válido"
+            );
+        }
 
-        return cuentaRepository.findById(
-                cuenta.getId()
-        ).orElseThrow(() ->
-                new RecursoNoEncontradoException(
-                        "Cuenta no encontrada con ID: "
-                                + cuenta.getId()
-                )
-        );
+        return cuentaRepository.findById(cuenta.getId())
+                .orElseThrow(() ->
+                        new RecursoNoEncontradoException(
+                                "Cuenta no encontrada con ID: "
+                                        + cuenta.getId()
+                        )
+                );
     }
 
 
@@ -939,24 +838,25 @@ public class MovimientoServiceImp implements MovimientoService {
     // =========================================================
 
     private Meta obtenerMeta(Meta meta) {
-
-        if (meta == null
-                || meta.getId() == null) {
-
+        if (meta == null || meta.getId() == null) {
             throw new ReglaNegocioException(
                     "La meta es obligatoria"
             );
         }
 
+        if (meta.getId() <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID de la meta debe ser válido"
+            );
+        }
 
-        return metaRepository.findById(
-                meta.getId()
-        ).orElseThrow(() ->
-                new RecursoNoEncontradoException(
-                        "Meta no encontrada con ID: "
-                                + meta.getId()
-                )
-        );
+        return metaRepository.findById(meta.getId())
+                .orElseThrow(() ->
+                        new RecursoNoEncontradoException(
+                                "Meta no encontrada con ID: "
+                                        + meta.getId()
+                        )
+                );
     }
 
 
@@ -964,26 +864,39 @@ public class MovimientoServiceImp implements MovimientoService {
     // VALIDAR MONTO
     // =========================================================
 
-    private void validarMonto(
-            BigDecimal monto) {
+    private void validarMonto(BigDecimal monto) {
+        if (monto == null) {
+            throw new ReglaNegocioException(
+                    "El monto es obligatorio"
+            );
+        }
 
-        if (monto == null
-                || monto.compareTo(
-                        BigDecimal.ZERO
-                ) <= 0) {
-
+        if (monto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ReglaNegocioException(
                     "El monto debe ser mayor a cero"
             );
         }
+
+        if (monto.scale() > 2) {
+            throw new ReglaNegocioException(
+                    "El monto no puede tener más de dos decimales"
+            );
+        }
     }
     
-    private void validarCategoriaParaMovimiento(Categoria categoria, TipoMovimiento tipoMovimiento) {
+    private void validarCategoriaParaMovimiento(
+            Categoria categoria,
+            TipoMovimiento tipoMovimiento) {
+
+        if (tipoMovimiento == null) {
+            throw new ReglaNegocioException(
+                    "El tipo de movimiento es obligatorio"
+            );
+        }
 
         if (categoria == null) {
-            if (tipoMovimiento == TipoMovimiento.GASTO ||
-                tipoMovimiento == TipoMovimiento.INGRESO) {
-
+            if (tipoMovimiento == TipoMovimiento.GASTO
+                    || tipoMovimiento == TipoMovimiento.INGRESO) {
                 throw new ReglaNegocioException(
                         "La categoría es obligatoria para gastos e ingresos"
                 );
@@ -1000,17 +913,15 @@ public class MovimientoServiceImp implements MovimientoService {
             );
         }
 
-        if (tipoMovimiento == TipoMovimiento.GASTO &&
-                !"GASTO".equalsIgnoreCase(tipoCategoria)) {
-
+        if (tipoMovimiento == TipoMovimiento.GASTO
+                && !"GASTO".equalsIgnoreCase(tipoCategoria.trim())) {
             throw new ReglaNegocioException(
                     "La categoría seleccionada no corresponde a un movimiento de GASTO"
             );
         }
 
-        if (tipoMovimiento == TipoMovimiento.INGRESO &&
-                !"INGRESO".equalsIgnoreCase(tipoCategoria)) {
-
+        if (tipoMovimiento == TipoMovimiento.INGRESO
+                && !"INGRESO".equalsIgnoreCase(tipoCategoria.trim())) {
             throw new ReglaNegocioException(
                     "La categoría seleccionada no corresponde a un movimiento de INGRESO"
             );
@@ -1023,13 +934,26 @@ public class MovimientoServiceImp implements MovimientoService {
     // VALIDAR SALDO
     // =========================================================
 
-    private void validarSaldo(
-            Cuenta cuenta,
-            BigDecimal monto) {
+    private void validarSaldo(Cuenta cuenta, BigDecimal monto) {
+        if (cuenta == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta es obligatoria"
+            );
+        }
 
-        if (cuenta.getSaldoActual()
-                .compareTo(monto) < 0) {
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ReglaNegocioException(
+                    "El monto debe ser mayor a cero"
+            );
+        }
 
+        if (cuenta.getSaldoActual() == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta no tiene un saldo inicializado"
+            );
+        }
+
+        if (cuenta.getSaldoActual().compareTo(monto) < 0) {
             throw new ReglaNegocioException(
                     "Saldo insuficiente"
             );

@@ -1,12 +1,17 @@
+
 package com.finova.controller;
 
 import com.finova.entity.Categoria;
 import com.finova.service.CategoriaService;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/categorias")
@@ -17,32 +22,56 @@ public class CategoriaController {
 
     @GetMapping
     public ResponseEntity<List<Categoria>> listarCategorias() {
-        return ResponseEntity.ok(categoriaService.listarCategorias());
+        return ResponseEntity.ok(
+                categoriaService.listarCategorias()
+        );
     }
 
     @GetMapping("/tipo/{tipo}")
-    public ResponseEntity<List<Categoria>> listarPorTipo(@PathVariable String tipo) {
-        return ResponseEntity.ok(categoriaService.listarPorTipo(tipo.toUpperCase()));
+    public ResponseEntity<List<Categoria>> listarPorTipo(
+            @PathVariable String tipo) {
+
+        return ResponseEntity.ok(
+                categoriaService.listarPorTipo(
+                        tipo.toUpperCase(Locale.ROOT)
+                )
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Categoria> buscarPorId(@PathVariable Long id) {
-        return ResponseEntity.ok(categoriaService.buscarPorId(id));
+    public ResponseEntity<Categoria> buscarPorId(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                categoriaService.buscarPorId(id)
+        );
     }
 
     @PostMapping
-    public ResponseEntity<Categoria> guardar(@RequestBody Categoria categoria) {
-        return ResponseEntity.ok(categoriaService.guardar(categoria));
+    public ResponseEntity<Categoria> guardar(
+            @RequestBody Categoria categoria) {
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(categoriaService.guardar(categoria));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Categoria> actualizar(@PathVariable Long id, @RequestBody Categoria categoria) {
-        return ResponseEntity.ok(categoriaService.actualizar(id, categoria));
+    public ResponseEntity<Categoria> actualizar(
+            @PathVariable Long id,
+            @RequestBody Categoria categoria) {
+
+        return ResponseEntity.ok(
+                categoriaService.actualizar(id, categoria)
+        );
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+    public ResponseEntity<Void> eliminar(
+            @PathVariable Long id) {
+
         categoriaService.eliminar(id);
+
         return ResponseEntity.noContent().build();
     }
 }

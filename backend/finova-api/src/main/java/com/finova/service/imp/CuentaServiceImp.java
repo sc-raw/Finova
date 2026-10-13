@@ -1,3 +1,4 @@
+
 package com.finova.service.imp;
 
 import com.finova.entity.Cuenta;
@@ -17,23 +18,30 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class CuentaServiceImp implements CuentaService {
 
     private final CuentaRepository cuentaRepository;
     private final UsuarioRepository usuarioRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public List<Cuenta> listarCuentas() {
         return cuentaRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Cuenta> listarPorUsuario(Long usuarioId) {
+        validarId(usuarioId, "usuario");
         return cuentaRepository.findByUsuarioId(usuarioId);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Cuenta buscarPorId(Long id) {
+        validarId(id, "cuenta");
+
         return cuentaRepository.findById(id)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
@@ -43,8 +51,24 @@ public class CuentaServiceImp implements CuentaService {
     }
 
     @Override
-    @Transactional
     public Cuenta guardar(Cuenta cuenta) {
+        if (cuenta == null) {
+            throw new ReglaNegocioException("La cuenta es obligatoria");
+        }
+
+        if (cuenta.getUsuario() == null ||
+                cuenta.getUsuario().getId() == null) {
+            throw new ReglaNegocioException(
+                    "El usuario de la cuenta es obligatorio"
+            );
+        }
+
+        if (cuenta.getNombre() == null ||
+                cuenta.getNombre().isBlank()) {
+            throw new ReglaNegocioException(
+                    "El nombre de la cuenta es obligatorio"
+            );
+        }
 
         Usuario usuario = usuarioRepository.findById(
                 cuenta.getUsuario().getId()
@@ -54,12 +78,26 @@ public class CuentaServiceImp implements CuentaService {
                 )
         );
 
-        if (cuenta.getSaldoInicial() == null) {
-            cuenta.setSaldoInicial(BigDecimal.ZERO);
+        BigDecimal saldoInicial = cuenta.getSaldoInicial() == null
+                ? BigDecimal.ZERO
+                : cuenta.getSaldoInicial();
+
+        if (saldoInicial.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ReglaNegocioException(
+                    "El saldo inicial no puede ser negativo"
+            );
         }
 
+        cuenta.setSaldoInicial(saldoInicial);
+
         if (cuenta.getSaldoActual() == null) {
-            cuenta.setSaldoActual(cuenta.getSaldoInicial());
+            cuenta.setSaldoActual(saldoInicial);
+        }
+
+        if (cuenta.getSaldoActual().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ReglaNegocioException(
+                    "El saldo actual no puede ser negativo"
+            );
         }
 
         cuenta.setUsuario(usuario);
@@ -68,12 +106,25 @@ public class CuentaServiceImp implements CuentaService {
     }
 
     @Override
-    @Transactional
     public Cuenta actualizar(Long id, Cuenta cuentaActualizada) {
+        validarId(id, "cuenta");
+
+        if (cuentaActualizada == null) {
+            throw new ReglaNegocioException(
+                    "Los datos de la cuenta son obligatorios"
+            );
+        }
 
         Cuenta existente = buscarPorId(id);
 
-        existente.setNombre(cuentaActualizada.getNombre());
+        if (cuentaActualizada.getNombre() == null ||
+                cuentaActualizada.getNombre().isBlank()) {
+            throw new ReglaNegocioException(
+                    "El nombre de la cuenta es obligatorio"
+            );
+        }
+
+        existente.setNombre(cuentaActualizada.getNombre().trim());
         existente.setNumeroCuenta(cuentaActualizada.getNumeroCuenta());
         existente.setBanco(cuentaActualizada.getBanco());
         existente.setMoneda(cuentaActualizada.getMoneda());
@@ -82,15 +133,21 @@ public class CuentaServiceImp implements CuentaService {
     }
 
     @Override
-    @Transactional
     public void eliminar(Long id) {
-
         Cuenta cuenta = buscarPorId(id);
 
-        if (cuenta.getSaldoActual().compareTo(BigDecimal.ZERO) != 0) {
+        BigDecimal saldo = cuenta.getSaldoActual();
+
+        if (saldo == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta no tiene un saldo actual válido"
+            );
+        }
+
+        if (saldo.compareTo(BigDecimal.ZERO) != 0) {
             throw new ReglaNegocioException(
                     "No se puede eliminar una cuenta con saldo. " +
-                    "Saldo actual: " + cuenta.getSaldoActual()
+                    "Saldo actual: " + saldo
             );
         }
 
@@ -98,55 +155,88 @@ public class CuentaServiceImp implements CuentaService {
     }
 
     @Override
-    @Transactional
-    public void actualizarSaldo(
-            Long cuentaId,
-            BigDecimal nuevoSaldo) {
-
+    public void actualizarSaldo(Long cuentaId, BigDecimal nuevoSaldo) {
         Cuenta cuenta = buscarPorId(cuentaId);
+
+        if (nuevoSaldo == null) {
+            throw new ReglaNegocioException(
+                    "El nuevo saldo es obligatorio"
+            );
+        }
+
+        if (nuevoSaldo.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ReglaNegocioException(
+                    "El saldo no puede ser negativo"
+            );
+        }
 
         cuenta.setSaldoActual(nuevoSaldo);
+        cuentaRepository.save(cuenta);
+    }
+
+    @Override
+    public void sumarSaldo(Long cuentaId, BigDecimal monto) {
+        validarMonto(monto);
+
+        Cuenta cuenta = buscarPorId(cuentaId);
+
+        BigDecimal saldoActual = obtenerSaldoActual(cuenta);
+        cuenta.setSaldoActual(saldoActual.add(monto));
 
         cuentaRepository.save(cuenta);
     }
 
     @Override
-    @Transactional
-    public void sumarSaldo(
-            Long cuentaId,
-            BigDecimal monto) {
+    public void restarSaldo(Long cuentaId, BigDecimal monto) {
+        validarMonto(monto);
 
         Cuenta cuenta = buscarPorId(cuentaId);
+        BigDecimal saldoActual = obtenerSaldoActual(cuenta);
 
-        cuenta.setSaldoActual(
-                cuenta.getSaldoActual().add(monto)
-        );
-
-        cuentaRepository.save(cuenta);
-    }
-
-    @Override
-    @Transactional
-    public void restarSaldo(
-            Long cuentaId,
-            BigDecimal monto) {
-
-        Cuenta cuenta = buscarPorId(cuentaId);
-
-        BigDecimal nuevoSaldo =
-                cuenta.getSaldoActual().subtract(monto);
+        BigDecimal nuevoSaldo = saldoActual.subtract(monto);
 
         if (nuevoSaldo.compareTo(BigDecimal.ZERO) < 0) {
             throw new ReglaNegocioException(
                     "Saldo insuficiente en la cuenta " +
                     cuenta.getNombre() +
-                    ". Saldo disponible: " +
-                    cuenta.getSaldoActual()
+                    ". Saldo disponible: " + saldoActual
             );
         }
 
         cuenta.setSaldoActual(nuevoSaldo);
-
         cuentaRepository.save(cuenta);
+    }
+
+    private void validarId(Long id, String entidad) {
+        if (id == null || id <= 0) {
+            throw new ReglaNegocioException(
+                    "El ID de " + entidad + " debe ser válido"
+            );
+        }
+    }
+
+    private void validarMonto(BigDecimal monto) {
+        if (monto == null ||
+                monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ReglaNegocioException(
+                    "El monto debe ser mayor que cero"
+            );
+        }
+
+        if (monto.scale() > 2) {
+            throw new ReglaNegocioException(
+                    "El monto no puede tener más de dos decimales"
+            );
+        }
+    }
+
+    private BigDecimal obtenerSaldoActual(Cuenta cuenta) {
+        if (cuenta.getSaldoActual() == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta no tiene un saldo actual válido"
+            );
+        }
+
+        return cuenta.getSaldoActual();
     }
 }
