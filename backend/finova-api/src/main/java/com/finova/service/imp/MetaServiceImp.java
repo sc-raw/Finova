@@ -8,6 +8,14 @@ import com.finova.exception.ReglaNegocioException;
 import com.finova.repository.MetaRepository;
 import com.finova.repository.UsuarioRepository;
 import com.finova.service.MetaService;
+import com.finova.entity.Cuenta;
+import com.finova.entity.Movimiento;
+import com.finova.entity.TipoMovimiento;
+import com.finova.service.MovimientoService;
+
+
+import java.time.LocalDateTime;
+
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +33,7 @@ public class MetaServiceImp implements MetaService {
 
     private final MetaRepository metaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final MovimientoService movimientoService;
 
     @Override
     @Transactional(readOnly = true)
@@ -157,21 +166,47 @@ public class MetaServiceImp implements MetaService {
     }
 
     @Override
-    public void retirar(Long metaId, BigDecimal monto) {
-        validarMontoPositivo(monto);
+    @Transactional
+    public void retirar(Long metaId, Long cuentaId, BigDecimal monto) {
 
-        Meta meta = buscarPorId(metaId);
-        BigDecimal actual = obtenerMontoActual(meta);
-        BigDecimal nuevoMonto = actual.subtract(monto);
-
-        if (nuevoMonto.compareTo(BigDecimal.ZERO) < 0) {
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ReglaNegocioException(
-                    "No se puede retirar más de lo ahorrado"
+                    "El monto debe ser mayor a cero"
             );
         }
 
-        meta.setMontoActual(nuevoMonto);
-        metaRepository.save(meta);
+        if (cuentaId == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta de destino es obligatoria"
+            );
+        }
+
+        Meta meta = metaRepository.findById(metaId)
+                .orElseThrow(() ->
+                        new RecursoNoEncontradoException(
+                                "Meta no encontrada"
+                        )
+                );
+
+        if (meta.getMontoActual() == null
+                || meta.getMontoActual().compareTo(monto) < 0) {
+            throw new ReglaNegocioException(
+                    "La meta no tiene saldo suficiente"
+            );
+        }
+
+        Cuenta cuentaDestino = new Cuenta();
+        cuentaDestino.setId(cuentaId);
+
+        Movimiento movimiento = new Movimiento();
+        movimiento.setCuentaDestino(cuentaDestino);
+        movimiento.setMeta(meta);
+        movimiento.setMonto(monto);
+        movimiento.setDescripcion("Retiro de dinero de la meta: " + meta.getNombre());
+        movimiento.setTipoMovimiento(TipoMovimiento.RETIRO_META);
+        movimiento.setFechaMovimiento(LocalDateTime.now());
+
+        movimientoService.guardar(movimiento);
     }
 
     @Override

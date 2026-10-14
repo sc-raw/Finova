@@ -5,7 +5,7 @@ import com.finova.dto.MetaResponseDTO;
 import com.finova.entity.Meta;
 import com.finova.exception.ReglaNegocioException;
 import com.finova.service.MetaService;
-
+import com.finova.service.MovimientoService;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpStatus;
@@ -22,6 +22,7 @@ import java.util.Map;
 public class MetaController {
 
     private final MetaService metaService;
+    private final MovimientoService movimientoService;
 
     @GetMapping
     public ResponseEntity<List<MetaResponseDTO>> listarMetas() {
@@ -103,20 +104,41 @@ public class MetaController {
             @PathVariable Long id,
             @RequestBody Map<String, BigDecimal> body) {
 
-        metaService.aportar(id, obtenerMonto(body));
+        Long cuentaId = body.get("cuentaId").longValue();
+        BigDecimal monto = obtenerMonto(body);
+
+        movimientoService.aportarMeta(
+                cuentaId,
+                id,
+                monto,
+                "Aporte a meta"
+        );
 
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{id}/retirar")
-    public ResponseEntity<Void> retirar(
-            @PathVariable Long id,
-            @RequestBody Map<String, BigDecimal> body) {
 
-        metaService.retirar(id, obtenerMonto(body));
 
-        return ResponseEntity.noContent().build();
-    }
+	@PutMapping("/{id}/retirar")
+	public ResponseEntity<Void> retirar(
+	        @PathVariable Long id,
+	        @RequestBody Map<String, BigDecimal> body) {
+	
+	    BigDecimal cuentaIdBody = body.get("cuentaId");
+	
+	    if (cuentaIdBody == null) {
+	        throw new IllegalArgumentException("La cuentaId es obligatoria");
+	    }
+	
+	    Long cuentaId = cuentaIdBody.longValue();
+	    BigDecimal monto = obtenerMonto(body);
+	
+	    metaService.retirar(id, cuentaId, monto);
+	
+	    return ResponseEntity.noContent().build();
+	}
+
+
 
     private BigDecimal obtenerMonto(Map<String, BigDecimal> body) {
         if (body == null || body.get("monto") == null) {

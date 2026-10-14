@@ -8,7 +8,8 @@ import com.finova.exception.ReglaNegocioException;
 import com.finova.repository.CuentaRepository;
 import com.finova.repository.UsuarioRepository;
 import com.finova.service.CuentaService;
-
+import com.finova.entity.Banco;
+import com.finova.repository.BancoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class CuentaServiceImp implements CuentaService {
 
     private final CuentaRepository cuentaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final BancoRepository bancoRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -50,87 +52,120 @@ public class CuentaServiceImp implements CuentaService {
                 );
     }
 
-    @Override
-    public Cuenta guardar(Cuenta cuenta) {
-        if (cuenta == null) {
-            throw new ReglaNegocioException("La cuenta es obligatoria");
-        }
 
-        if (cuenta.getUsuario() == null ||
-                cuenta.getUsuario().getId() == null) {
-            throw new ReglaNegocioException(
-                    "El usuario de la cuenta es obligatorio"
-            );
-        }
+	@Override
+	public Cuenta guardar(Cuenta cuenta) {
+	    if (cuenta == null) {
+	        throw new ReglaNegocioException("La cuenta es obligatoria");
+	    }
+	
+	    if (cuenta.getUsuario() == null ||
+	            cuenta.getUsuario().getId() == null) {
+	        throw new ReglaNegocioException(
+	                "El usuario de la cuenta es obligatorio"
+	        );
+	    }
+	
+	    if (cuenta.getBanco() == null ||
+	            cuenta.getBanco().getId() == null) {
+	        throw new ReglaNegocioException(
+	                "El banco de la cuenta es obligatorio"
+	        );
+	    }
+	
+	    if (cuenta.getNombre() == null ||
+	            cuenta.getNombre().isBlank()) {
+	        throw new ReglaNegocioException(
+	                "El nombre de la cuenta es obligatorio"
+	        );
+	    }
+	
+	    Usuario usuario = usuarioRepository.findById(
+	            cuenta.getUsuario().getId()
+	    ).orElseThrow(() ->
+	            new RecursoNoEncontradoException(
+	                    "Usuario no encontrado"
+	            )
+	    );
+	
+	    Banco banco = bancoRepository.findById(
+	            cuenta.getBanco().getId()
+	    ).orElseThrow(() ->
+	            new RecursoNoEncontradoException(
+	                    "Banco no encontrado"
+	            )
+	    );
+	
+	    BigDecimal saldoInicial = cuenta.getSaldoInicial() == null
+	            ? BigDecimal.ZERO
+	            : cuenta.getSaldoInicial();
+	
+	    if (saldoInicial.compareTo(BigDecimal.ZERO) < 0) {
+	        throw new ReglaNegocioException(
+	                "El saldo inicial no puede ser negativo"
+	        );
+	    }
+	
+	    cuenta.setSaldoInicial(saldoInicial);
+	
+	    if (cuenta.getSaldoActual() == null) {
+	        cuenta.setSaldoActual(saldoInicial);
+	    }
+	
+	    if (cuenta.getSaldoActual().compareTo(BigDecimal.ZERO) < 0) {
+	        throw new ReglaNegocioException(
+	                "El saldo actual no puede ser negativo"
+	        );
+	    }
+	
+	    cuenta.setUsuario(usuario);
+	    cuenta.setBanco(banco);
+	
+	    return cuentaRepository.save(cuenta);
+	}
+	
+	@Override
+	public Cuenta actualizar(Long id, Cuenta cuentaActualizada) {
+	    validarId(id, "cuenta");
+	
+	    if (cuentaActualizada == null) {
+	        throw new ReglaNegocioException(
+	                "Los datos de la cuenta son obligatorios"
+	        );
+	    }
+	
+	    Cuenta existente = buscarPorId(id);
+	
+	    if (cuentaActualizada.getNombre() == null ||
+	            cuentaActualizada.getNombre().isBlank()) {
+	        throw new ReglaNegocioException(
+	                "El nombre de la cuenta es obligatorio"
+	        );
+	    }
+	
+	    if (cuentaActualizada.getBanco() == null ||
+	            cuentaActualizada.getBanco().getId() == null) {
+	        throw new ReglaNegocioException(
+	                "El banco de la cuenta es obligatorio"
+	        );
+	    }
+	
+	    Banco banco = bancoRepository.findById(
+	            cuentaActualizada.getBanco().getId()
+	    ).orElseThrow(() ->
+	            new RecursoNoEncontradoException(
+	                    "Banco no encontrado"
+	            )
+	    );
+	
+	    existente.setNombre(cuentaActualizada.getNombre().trim());
+	    existente.setNumeroCuenta(cuentaActualizada.getNumeroCuenta());
+	    existente.setBanco(banco);
+	    existente.setMoneda(cuentaActualizada.getMoneda());
+	
+	    return cuentaRepository.save(existente);
+	}
 
-        if (cuenta.getNombre() == null ||
-                cuenta.getNombre().isBlank()) {
-            throw new ReglaNegocioException(
-                    "El nombre de la cuenta es obligatorio"
-            );
-        }
-
-        Usuario usuario = usuarioRepository.findById(
-                cuenta.getUsuario().getId()
-        ).orElseThrow(() ->
-                new RecursoNoEncontradoException(
-                        "Usuario no encontrado"
-                )
-        );
-
-        BigDecimal saldoInicial = cuenta.getSaldoInicial() == null
-                ? BigDecimal.ZERO
-                : cuenta.getSaldoInicial();
-
-        if (saldoInicial.compareTo(BigDecimal.ZERO) < 0) {
-            throw new ReglaNegocioException(
-                    "El saldo inicial no puede ser negativo"
-            );
-        }
-
-        cuenta.setSaldoInicial(saldoInicial);
-
-        if (cuenta.getSaldoActual() == null) {
-            cuenta.setSaldoActual(saldoInicial);
-        }
-
-        if (cuenta.getSaldoActual().compareTo(BigDecimal.ZERO) < 0) {
-            throw new ReglaNegocioException(
-                    "El saldo actual no puede ser negativo"
-            );
-        }
-
-        cuenta.setUsuario(usuario);
-
-        return cuentaRepository.save(cuenta);
-    }
-
-    @Override
-    public Cuenta actualizar(Long id, Cuenta cuentaActualizada) {
-        validarId(id, "cuenta");
-
-        if (cuentaActualizada == null) {
-            throw new ReglaNegocioException(
-                    "Los datos de la cuenta son obligatorios"
-            );
-        }
-
-        Cuenta existente = buscarPorId(id);
-
-        if (cuentaActualizada.getNombre() == null ||
-                cuentaActualizada.getNombre().isBlank()) {
-            throw new ReglaNegocioException(
-                    "El nombre de la cuenta es obligatorio"
-            );
-        }
-
-        existente.setNombre(cuentaActualizada.getNombre().trim());
-        existente.setNumeroCuenta(cuentaActualizada.getNumeroCuenta());
-        existente.setBanco(cuentaActualizada.getBanco());
-        existente.setMoneda(cuentaActualizada.getMoneda());
-
-        return cuentaRepository.save(existente);
-    }
 
     @Override
     public void eliminar(Long id) {

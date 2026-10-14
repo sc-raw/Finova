@@ -21,7 +21,7 @@ public interface MetaService {
 
     void aportar(Long metaId, BigDecimal monto);
 
-    void retirar(Long metaId, BigDecimal monto);
+    void retirar(Long metaId, Long cuentaId, BigDecimal monto);
 
     BigDecimal calcularProgreso(Long metaId);
 }

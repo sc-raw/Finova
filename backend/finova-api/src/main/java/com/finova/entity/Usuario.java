@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 @Entity
@@ -28,6 +28,7 @@ public class Usuario {
     @Column(nullable = false, unique = true)
     private String correo;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 

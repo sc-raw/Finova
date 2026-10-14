@@ -45,7 +45,12 @@ public class ComprobanteController {
 
     @PostMapping
     public ResponseEntity<Comprobante> guardar(
-            @RequestBody Comprobante comprobante) {
+            @RequestBody(required = false) Comprobante comprobante) {
+
+        if (comprobante == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(comprobanteService.guardar(comprobante));
     }

@@ -453,6 +453,14 @@ public class MovimientoServiceImp implements MovimientoService {
             BigDecimal monto,
             String descripcion) {
 
+        if (cuentaId == null || metaId == null) {
+            throw new ReglaNegocioException(
+                    "La cuenta y la meta son obligatorias"
+            );
+        }
+
+        validarMonto(monto);
+
         Cuenta cuenta = cuentaRepository.findById(cuentaId)
                 .orElseThrow(() ->
                         new RecursoNoEncontradoException(
@@ -467,20 +475,6 @@ public class MovimientoServiceImp implements MovimientoService {
                         )
                 );
 
-        validarMonto(monto);
-        validarSaldo(cuenta, monto);
-
-        BigDecimal nuevoMonto = meta.getMontoActual().add(monto);
-
-        if (nuevoMonto.compareTo(meta.getMontoObjetivo()) > 0) {
-            throw new ReglaNegocioException(
-                    "El aporte supera el monto objetivo de la meta"
-            );
-        }
-
-        cuenta.setSaldoActual(cuenta.getSaldoActual().subtract(monto));
-        meta.setMontoActual(nuevoMonto);
-
         Movimiento movimiento = new Movimiento();
         movimiento.setCuentaOrigen(cuenta);
         movimiento.setMeta(meta);
@@ -489,11 +483,8 @@ public class MovimientoServiceImp implements MovimientoService {
         movimiento.setTipoMovimiento(TipoMovimiento.APORTE_META);
         movimiento.setFechaMovimiento(LocalDateTime.now());
 
-        cuentaRepository.save(cuenta);
-        metaRepository.save(meta);
-        movimientoRepository.save(movimiento);
+        guardar(movimiento);
     }
-
 
     // =========================================================
     // LISTAR POR TIPO Y USUARIO
