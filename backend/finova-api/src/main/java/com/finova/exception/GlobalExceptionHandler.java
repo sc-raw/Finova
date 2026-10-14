@@ -1,5 +1,7 @@
+
 package com.finova.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,6 +35,31 @@ public class GlobalExceptionHandler {
             CredencialesInvalidasException ex) {
         return construirRespuesta(
                 HttpStatus.UNAUTHORIZED, ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> manejarIntegridadDatos(
+            DataIntegrityViolationException ex) {
+
+        String mensaje = "No se pudo guardar el registro porque "
+                + "incumple una restricción de los datos";
+
+        Throwable causa = ex;
+        while (causa != null) {
+            String detalle = causa.getMessage();
+
+            if (detalle != null &&
+                    detalle.toLowerCase().contains("duplicate entry")) {
+                mensaje = "Ya existe un registro con ese valor";
+                break;
+            }
+
+            causa = causa.getCause();
+        }
+
+        return construirRespuesta(
+                HttpStatus.BAD_REQUEST, mensaje
         );
     }
 
