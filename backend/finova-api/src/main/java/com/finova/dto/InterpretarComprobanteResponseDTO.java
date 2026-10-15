@@ -26,6 +26,7 @@ public class InterpretarComprobanteResponseDTO {
     private String categoriaSugerida;
     private BigDecimal confianza;
     private List<ItemDTO> items;
+    private String rutaImagen;
 
     @Getter
     @Setter

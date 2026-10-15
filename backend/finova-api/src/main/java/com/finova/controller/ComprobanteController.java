@@ -90,19 +90,23 @@ public class ComprobanteController {
     
     
    
-    @PostMapping(value = "/analizar-imagen", consumes = "multipart/form-data")
-    public ResponseEntity<InterpretarComprobanteResponseDTO> analizarImagen(
-            @RequestParam("imagen") MultipartFile imagen) throws IOException {
 
-        String rutaImagen = almacenamientoComprobanteService.guardarImagen(imagen);
+	@PostMapping(value = "/analizar-imagen", consumes = "multipart/form-data")
+	public ResponseEntity<InterpretarComprobanteResponseDTO> analizarImagen(
+	        @RequestParam("imagen") MultipartFile imagen) throws IOException {
+	
+	    String rutaImagen = almacenamientoComprobanteService.guardarImagen(imagen);
+	
+	    String textoOCR = ocrService.extraerTexto(rutaImagen);
+	
+	    InterpretarComprobanteResponseDTO resultado =
+	            geminiService.interpretarComprobante(textoOCR);
+	
+	    resultado.setRutaImagen(rutaImagen);
+	
+	    return ResponseEntity.ok(resultado);
+	}
 
-        String textoOCR = ocrService.extraerTexto(rutaImagen);
-
-        InterpretarComprobanteResponseDTO resultado =
-                geminiService.interpretarComprobante(textoOCR);
-
-        return ResponseEntity.ok(resultado);
-    }
     
     
     
