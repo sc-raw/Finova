@@ -10,6 +10,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import com.finova.service.OcrService;
+import com.finova.service.AlmacenamientoComprobanteService;
+
+
 import java.util.List;
 
 @RestController
@@ -19,6 +25,8 @@ public class ComprobanteController {
 
     private final GeminiService geminiService;
     private final ComprobanteService comprobanteService;
+    private final OcrService ocrService;
+    private final AlmacenamientoComprobanteService almacenamientoComprobanteService;
 
     @GetMapping
     public ResponseEntity<List<Comprobante>> listarComprobantes() {
@@ -78,4 +86,35 @@ public class ComprobanteController {
                 geminiService.interpretarComprobante(request.getOcrText())
         );
     }
+    
+    
+    
+   
+    @PostMapping(value = "/analizar-imagen", consumes = "multipart/form-data")
+    public ResponseEntity<InterpretarComprobanteResponseDTO> analizarImagen(
+            @RequestParam("imagen") MultipartFile imagen) throws IOException {
+
+        String rutaImagen = almacenamientoComprobanteService.guardarImagen(imagen);
+
+        String textoOCR = ocrService.extraerTexto(rutaImagen);
+
+        InterpretarComprobanteResponseDTO resultado =
+                geminiService.interpretarComprobante(textoOCR);
+
+        return ResponseEntity.ok(resultado);
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 }

@@ -35,3 +35,7 @@ Desktop.ini
 *.db
 *.sqlite
 *.sqlite3
+
+# ===== Finova: comprobantes y archivos locales =====
+backend/finova-api/uploads/
+backend/finova-api/application-local.properties
