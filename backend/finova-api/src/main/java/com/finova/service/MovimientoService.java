@@ -49,6 +49,12 @@ public interface MovimientoService {
             String descripcion
     );
 
+
+    Movimiento confirmarComprobante(
+            com.finova.dto.ConfirmarComprobanteRequestDTO request
+    );
+
+
     List<Movimiento> listarPorTipoYUsuario(
             String tipo,
             Long usuarioId

@@ -47,7 +47,35 @@
   	 		 <groupId>org.springframework.boot</groupId>
 		    <artifactId>spring-boot-starter-jdbc</artifactId>
 		</dependency>
-	
+
+
+
+
+
+		<dependency>
+		    <groupId>io.jsonwebtoken</groupId>
+		    <artifactId>jjwt-api</artifactId>
+		    <version>0.12.6</version>
+		</dependency>
+		<dependency>
+		    <groupId>io.jsonwebtoken</groupId>
+		    <artifactId>jjwt-impl</artifactId>
+		    <version>0.12.6</version>
+		    <scope>runtime</scope>
+		</dependency>
+		<dependency>
+		    <groupId>io.jsonwebtoken</groupId>
+		    <artifactId>jjwt-jackson</artifactId>
+		    <version>0.12.6</version>
+		    <scope>runtime</scope>
+		</dependency>
+
+
+
+
+
+
+
 		<dependency>
 		    <groupId>net.sourceforge.tess4j</groupId>
 		    <artifactId>tess4j</artifactId>
@@ -79,7 +107,7 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		
+
 		<!-- Jackson Databind: convierte objetos Java a JSON y viceversa.
      Spring Boot normalmente la incluye con spring-boot-starter-web,
      pero si no está, hay que declararla explícitamente. -->
@@ -95,7 +123,7 @@
     <artifactId>spring-boot-starter-webflux</artifactId>
 </dependency>
 
-		
+
 	</dependencies>
 
 	<build>

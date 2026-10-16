@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 public interface ComprobanteRepository extends JpaRepository<Comprobante, Long> {
 
     Comprobante findByMovimientoId(Long movimientoId);
+
+    boolean existsByCodigoOperacion(String codigoOperacion);
 }

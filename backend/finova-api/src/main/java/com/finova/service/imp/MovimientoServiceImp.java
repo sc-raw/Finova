@@ -486,6 +486,102 @@ public class MovimientoServiceImp implements MovimientoService {
         guardar(movimiento);
     }
 
+
+
+
+
+
+
+    @Override
+    public Movimiento confirmarComprobante(
+            com.finova.dto.ConfirmarComprobanteRequestDTO request) {
+
+        if (request == null) {
+            throw new ReglaNegocioException(
+                    "Los datos del comprobante son obligatorios"
+            );
+        }
+
+
+        if (request.getCodigoOperacion() != null
+                && !request.getCodigoOperacion().isBlank()
+                && comprobanteRepository.existsByCodigoOperacion(
+                        request.getCodigoOperacion().trim())) {
+
+            throw new ReglaNegocioException(
+                    "Este comprobante ya fue registrado"
+            );
+        }
+
+        if (request.getTipoMovimiento() == null) {
+            throw new ReglaNegocioException(
+                    "El tipo de movimiento es obligatorio"
+            );
+        }
+
+        Movimiento movimiento = new Movimiento();
+
+        movimiento.setTipoMovimiento(request.getTipoMovimiento());
+        movimiento.setMonto(request.getMonto());
+        movimiento.setFechaMovimiento(request.getFechaMovimiento());
+        movimiento.setDescripcion(request.getDescripcion());
+
+        if (request.getCuentaOrigenId() != null) {
+            Cuenta cuentaOrigen = cuentaRepository.findById(
+                    request.getCuentaOrigenId()
+            ).orElseThrow(() -> new RecursoNoEncontradoException(
+                    "Cuenta de origen no encontrada"
+            ));
+
+            movimiento.setCuentaOrigen(cuentaOrigen);
+        }
+
+        if (request.getCuentaDestinoId() != null) {
+            Cuenta cuentaDestino = cuentaRepository.findById(
+                    request.getCuentaDestinoId()
+            ).orElseThrow(() -> new RecursoNoEncontradoException(
+                    "Cuenta de destino no encontrada"
+            ));
+
+            movimiento.setCuentaDestino(cuentaDestino);
+        }
+
+        if (request.getCategoriaId() != null) {
+            Categoria categoria = categoriaRepository.findById(
+                    request.getCategoriaId()
+            ).orElseThrow(() -> new RecursoNoEncontradoException(
+                    "Categoría no encontrada"
+            ));
+
+            movimiento.setCategoria(categoria);
+        }
+
+        if (request.getMetodoPagoId() != null) {
+            MetodoPago metodoPago = metodoPagoRepository.findById(
+                    request.getMetodoPagoId()
+            ).orElseThrow(() -> new RecursoNoEncontradoException(
+                    "Método de pago no encontrado"
+            ));
+
+            movimiento.setMetodoPago(metodoPago);
+        }
+
+        Movimiento guardado = guardar(movimiento);
+
+        Comprobante comprobante = new Comprobante();
+        comprobante.setMovimiento(guardado);
+        comprobante.setNombreComercio(request.getNombreComercio());
+        comprobante.setRuc(request.getRuc());
+        comprobante.setCodigoOperacion(request.getCodigoOperacion());
+        comprobante.setRutaComprobante(request.getRutaComprobante());
+
+        comprobanteRepository.save(comprobante);
+
+        return guardado;
+    }
+
+
+
     // =========================================================
     // LISTAR POR TIPO Y USUARIO
     // =========================================================
@@ -874,7 +970,7 @@ public class MovimientoServiceImp implements MovimientoService {
             );
         }
     }
-    
+
     private void validarCategoriaParaMovimiento(
             Categoria categoria,
             TipoMovimiento tipoMovimiento) {
@@ -918,7 +1014,7 @@ public class MovimientoServiceImp implements MovimientoService {
             );
         }
     }
-    
+
 
 
     // =========================================================

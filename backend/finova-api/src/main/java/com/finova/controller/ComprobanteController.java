@@ -15,6 +15,18 @@ import java.io.IOException;
 import com.finova.service.OcrService;
 import com.finova.service.AlmacenamientoComprobanteService;
 
+import com.finova.dto.ConfirmarComprobanteRequestDTO;
+import com.finova.entity.Movimiento;
+import com.finova.service.MovimientoService;
+
+
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+
 
 import java.util.List;
 
@@ -27,6 +39,7 @@ public class ComprobanteController {
     private final ComprobanteService comprobanteService;
     private final OcrService ocrService;
     private final AlmacenamientoComprobanteService almacenamientoComprobanteService;
+    private final MovimientoService movimientoService;
 
     @GetMapping
     public ResponseEntity<List<Comprobante>> listarComprobantes() {
@@ -86,39 +99,83 @@ public class ComprobanteController {
                 geminiService.interpretarComprobante(request.getOcrText())
         );
     }
-    
-    
-    
-   
 
-	@PostMapping(value = "/analizar-imagen", consumes = "multipart/form-data")
-	public ResponseEntity<InterpretarComprobanteResponseDTO> analizarImagen(
-	        @RequestParam("imagen") MultipartFile imagen) throws IOException {
-	
-	    String rutaImagen = almacenamientoComprobanteService.guardarImagen(imagen);
-	
-	    String textoOCR = ocrService.extraerTexto(rutaImagen);
-	
-	    InterpretarComprobanteResponseDTO resultado =
-	            geminiService.interpretarComprobante(textoOCR);
-	
-	    resultado.setRutaImagen(rutaImagen);
-	
-	    return ResponseEntity.ok(resultado);
-	}
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    @PostMapping("/confirmar")
+    public ResponseEntity<Movimiento> confirmarComprobante(
+            @RequestBody ConfirmarComprobanteRequestDTO request) {
+
+        Movimiento movimiento =
+                movimientoService.confirmarComprobante(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(movimiento);
+    }
+
+
+    @PostMapping(value = "/analizar-imagen", consumes = "multipart/form-data")
+    public ResponseEntity<InterpretarComprobanteResponseDTO> analizarImagen(
+            @RequestParam("imagen") MultipartFile imagen) throws IOException {
+
+        String rutaImagen = almacenamientoComprobanteService.guardarImagen(imagen);
+
+        try {
+            String textoOCR = ocrService.extraerTexto(rutaImagen);
+
+            InterpretarComprobanteResponseDTO resultado =
+                    geminiService.interpretarComprobante(textoOCR);
+
+            resultado.setRutaImagen(rutaImagen);
+
+            return ResponseEntity.ok(resultado);
+
+        } catch (Exception e) {
+            almacenamientoComprobanteService.eliminarImagen(rutaImagen);
+            throw e;
+        }
+    }
+
+
+
+
+
+    @GetMapping("/{id}/imagen")
+    public ResponseEntity<Resource> verImagen(@PathVariable Long id)
+            throws IOException {
+
+        Comprobante comprobante = comprobanteService.buscarPorId(id);
+
+        String rutaImagen = comprobante.getRutaComprobante();
+
+        if (rutaImagen == null || rutaImagen.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Path ruta = Paths.get(rutaImagen).toAbsolutePath().normalize();
+
+        if (!Files.exists(ruta) || !Files.isRegularFile(ruta)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Resource imagen = new UrlResource(ruta.toUri());
+
+        String tipoContenido = Files.probeContentType(ruta);
+
+        MediaType mediaType = tipoContenido != null
+                ? MediaType.parseMediaType(tipoContenido)
+                : MediaType.APPLICATION_OCTET_STREAM;
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .body(imagen);
+    }
+
+
+
+
+
+
+
+
+
 }

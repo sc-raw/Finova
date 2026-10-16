@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.finova.dto.LoginResponseDTO;
+import com.finova.security.JwtService;
 
 import java.util.List;
 
@@ -19,6 +21,7 @@ import java.util.List;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final JwtService jwtService;
 
     @GetMapping
     public ResponseEntity<List<UsuarioResponseDTO>> listarUsuarios() {
@@ -75,16 +78,23 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UsuarioResponseDTO> login(
+    public ResponseEntity<LoginResponseDTO> login(
             @RequestBody LoginRequestDTO request) {
+
         Usuario usuario = usuarioService.login(
                 request.getCorreo(),
                 request.getPassword()
         );
 
-        return ResponseEntity.ok(
+        String token = jwtService.generarToken(usuario.getCorreo());
+
+        LoginResponseDTO respuesta = new LoginResponseDTO(
+                token,
+                "Bearer",
                 UsuarioResponseDTO.desdeEntidad(usuario)
         );
+
+        return ResponseEntity.ok(respuesta);
     }
 
     @PutMapping("/{id}/password")
