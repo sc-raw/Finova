@@ -20,14 +20,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
+import com.example.Finova.core.network.dto.MovimientoDto
 import com.example.Finova.core.util.formatSoles
+import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
 
 // ============================================================
 // FINOVA — Dashboard (Inicio)
 // Vertical 2 · feature/inicio
-// Basado en Image 6.html — SOLO VISTA (datos hardcodeados)
 // ============================================================
 
 // --- Modelos locales solo para la vista ---
@@ -44,57 +46,34 @@ private data class MovimientoVisual(
 @Composable
 fun DashboardScreen(
     onNavigate: (String) -> Unit,
-    onScanClick: () -> Unit
+    onScanClick: () -> Unit,
+    viewModel: DashboardViewModel = viewModel()
 ) {
-    // --- Datos hardcodeados (temporal) ---
+    // --- Estado del bottom sheet ---
+    var mostrarSheet by remember { mutableStateOf(false) }
     var saldosOcultos by remember { mutableStateOf(false) }
 
-    val nombre = "Diego"
-    val mes = "Marzo 2025"
-    val saldoTotalSoles = 8450.20
-    val saldoTotalUsd = 2253.38
-    val tipoCambio = 3.75
-    val ingresosMes = 4500.00
-    val gastosMes = 1820.50
+    // --- Datos del ViewModel ---
+    val cargando by viewModel.cargando.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val cuentas by viewModel.cuentas.collectAsState()
+    val movimientosDto by viewModel.movimientos.collectAsState()
+
+    // --- Mapear DTOs a modelo visual ---
+    val movimientos: List<MovimientoVisual> = movimientosDto
+        .take(5)
+        .map { dto -> dto.toVisual() }
+
+    val nombre = viewModel.nombresUsuario.ifBlank { "Usuario" }
+    val mes = "Marzo 2025" // TODO: usar Formatters para el mes actual
+    val saldoTotalSoles = viewModel.saldoTotalSoles
+    val saldoTotalUsd = viewModel.saldoTotalUsd
+    val tipoCambio = viewModel.tipoCambio
+    val ingresosMes = viewModel.ingresosMes
+    val gastosMes = viewModel.gastosMes
     val presupuestoPct = 74
     val presupuestoRestante = 1420.00
     val presupuestoTotal = 5500.00
-
-    val movimientos = listOf(
-        MovimientoVisual(
-            titulo = "Supermercado Metro",
-            subtitulo = "Alimentación · Hoy, 13:45",
-            monto = 142.50,
-            esIngreso = false,
-            cuenta = "BCP ••4821",
-            icono = Icons.Outlined.ShoppingCart,
-            tieneIa = true
-        ),
-        MovimientoVisual(
-            titulo = "Transferencia Sueldo",
-            subtitulo = "Salario mensual · Ayer, 09:00",
-            monto = 3800.00,
-            esIngreso = true,
-            cuenta = "BCP Soles",
-            icono = Icons.Outlined.SouthWest
-        ),
-        MovimientoVisual(
-            titulo = "Starbucks Coffee",
-            subtitulo = "Café & Salidas · Ayer, 18:20",
-            monto = 24.50,
-            esIngreso = false,
-            cuenta = "Efectivo",
-            icono = Icons.Outlined.LocalCafe
-        ),
-        MovimientoVisual(
-            titulo = "Recibo Luz Enel",
-            subtitulo = "Servicios del hogar · 18 Feb",
-            monto = 85.00,
-            esIngreso = false,
-            cuenta = "BCP ••4821",
-            icono = Icons.Outlined.Bolt
-        )
-    )
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -102,10 +81,22 @@ fun DashboardScreen(
             BottomNavBar(
                 currentRoute = "dashboard",
                 onNavigate = onNavigate,
-                onScanClick = onScanClick
+                onScanClick = { mostrarSheet = true }
             )
         }
     ) { padding ->
+        if (cargando) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = FinovaPrimary)
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -119,6 +110,26 @@ fun DashboardScreen(
                     saldosOcultos = saldosOcultos,
                     onToggleSaldos = { saldosOcultos = !saldosOcultos }
                 )
+            }
+
+            // Errores (si los hay) sin romper el diseño
+            error?.let { msg ->
+                item {
+                    Surface(
+                        color = FinovaErrorContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = msg,
+                            style = FinovaBodySm,
+                            color = FinovaError,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
             }
 
             item {
@@ -159,12 +170,23 @@ fun DashboardScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            items(movimientos.size) { index ->
-                MovimientoRow(
-                    mov = movimientos[index],
-                    saldosOcultos = saldosOcultos
-                )
-                Spacer(Modifier.height(8.dp))
+            if (movimientos.isEmpty()) {
+                item {
+                    Text(
+                        text = "No hay movimientos aún",
+                        style = FinovaBodySm,
+                        color = FinovaOnSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            } else {
+                items(movimientos.size) { index ->
+                    MovimientoRow(
+                        mov = movimientos[index],
+                        saldosOcultos = saldosOcultos
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
             }
 
             item {
@@ -178,10 +200,67 @@ fun DashboardScreen(
             }
         }
     }
+
+    // ---------- Bottom Sheet de "Nueva Transacción" ----------
+    if (mostrarSheet) {
+        NuevaTransaccionSheet(
+            onDismiss = { mostrarSheet = false },
+            onEscanear = {
+                mostrarSheet = false
+                onScanClick()
+            },
+            onSubirImagen = {
+                mostrarSheet = false
+                onNavigate("escanear")
+            },
+            onAgregarManual = {
+                mostrarSheet = false
+                onNavigate("detalle_movimiento")
+            },
+            onTransferir = {
+                mostrarSheet = false
+                onNavigate("transferir")
+            }
+        )
+    }
 }
 
 // ============================================================
-// Componentes internos de la pantalla
+// Mapeo DTO → Visual
+// ============================================================
+
+private fun MovimientoDto.toVisual(): MovimientoVisual {
+    val esIngreso = tipoMovimiento == "INGRESO"
+
+    val icono: ImageVector = when {
+        tipoMovimiento == "TRANSFERENCIA" -> Icons.Outlined.SwapHoriz
+        tipoMovimiento == "APORTE_META" -> Icons.Outlined.Savings
+        tipoMovimiento == "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
+        esIngreso -> Icons.Outlined.SouthWest
+        else -> Icons.Outlined.ShoppingCart
+    }
+
+    val subtitulo = buildString {
+        if (!categoriaNombre.isNullOrBlank()) {
+            append(categoriaNombre)
+            append(" · ")
+        }
+        append(fechaMovimiento?.take(10) ?: "")
+    }
+
+    return MovimientoVisual(
+        titulo = descripcion ?: "Movimiento",
+        subtitulo = subtitulo,
+        monto = monto ?: 0.0,
+        esIngreso = esIngreso,
+        cuenta = cuentaOrigenNombre ?: cuentaDestinoNombre ?: "",
+        icono = icono,
+        tieneIa = false
+    )
+}
+
+// ============================================================
+// Componentes internos de la pantalla (SIN CAMBIOS)
 // ============================================================
 
 @Composable

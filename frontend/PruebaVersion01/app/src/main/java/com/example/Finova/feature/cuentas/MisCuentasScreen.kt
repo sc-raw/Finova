@@ -13,7 +13,7 @@ import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,14 +21,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
+import com.example.Finova.core.network.dto.CuentaDto
 import com.example.Finova.core.util.formatSoles
+import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
 
 // ============================================================
 // FINOVA — Mis Cuentas
 // Vertical 2 · feature/cuentas
-// Basado en Image 4.html — SOLO VISTA (datos hardcodeados)
 // ============================================================
 
 private data class CuentaVisual(
@@ -44,38 +46,16 @@ private data class CuentaVisual(
 @Composable
 fun MisCuentasScreen(
     onNavigate: (String) -> Unit,
-    onTransferClick: () -> Unit
+    onTransferClick: () -> Unit,
+    viewModel: CuentasViewModel = viewModel()
 ) {
-    // --- Datos hardcodeados (temporal) ---
-    val cuentas = listOf(
-        CuentaVisual(
-            titulo = "BCP Soles - Cuenta Sueldo",
-            numero = "•••• 4821",
-            estado = "Hoy",
-            saldo = 5820.00,
-            icono = Icons.Outlined.AccountBalance,
-            iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
-            iconTint = FinovaSecondary
-        ),
-        CuentaVisual(
-            titulo = "BCP Soles - Ahorros",
-            numero = "•••• 9023",
-            estado = "Soles",
-            saldo = 2437.50,
-            icono = Icons.Outlined.Savings,
-            iconBg = FinovaPrimaryContainer.copy(alpha = 0.2f),
-            iconTint = FinovaPrimary
-        ),
-        CuentaVisual(
-            titulo = "BBVA - Tarjeta Débito",
-            numero = "•••• 1145",
-            estado = "Activa",
-            saldo = 1200.00,
-            icono = Icons.Outlined.CreditCard,
-            iconBg = FinovaTertiaryFixed.copy(alpha = 0.4f),
-            iconTint = FinovaTertiary
-        )
-    )
+    var mostrarSheet by remember { mutableStateOf(false) }
+
+    val cargando by viewModel.cargando.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val cuentasDto by viewModel.cuentas.collectAsState()
+
+    val cuentas: List<CuentaVisual> = cuentasDto.map { it.toVisual() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -84,17 +64,28 @@ fun MisCuentasScreen(
             BottomNavBar(
                 currentRoute = "mis_cuentas",
                 onNavigate = onNavigate,
-                onScanClick = { onNavigate("escanear") }
+                onScanClick = { mostrarSheet = true }
             )
         }
     ) { padding ->
+        if (cargando) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = FinovaPrimary)
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // ---------- Título de sección + Filtrar ----------
             item {
                 Row(
                     modifier = Modifier
@@ -123,13 +114,41 @@ fun MisCuentasScreen(
                 }
             }
 
-            // ---------- Lista de cuentas ----------
-            items(cuentas.size) { index ->
-                CuentaCard(cuenta = cuentas[index])
-                Spacer(Modifier.height(12.dp))
+            error?.let { msg ->
+                item {
+                    Surface(
+                        color = FinovaErrorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = msg,
+                            style = FinovaBodySm,
+                            color = FinovaError,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
             }
 
-            // ---------- Botones duales ----------
+            if (cuentas.isEmpty()) {
+                item {
+                    Text(
+                        text = "No tienes cuentas registradas",
+                        style = FinovaBodySm,
+                        color = FinovaOnSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            } else {
+                items(cuentas.size) { index ->
+                    CuentaCard(cuenta = cuentas[index])
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+
             item {
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -138,7 +157,6 @@ fun MisCuentasScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Nueva cuenta (outline)
                     Button(
                         onClick = { },
                         modifier = Modifier
@@ -164,7 +182,6 @@ fun MisCuentasScreen(
                         )
                     }
 
-                    // Transferir (primary)
                     Button(
                         onClick = onTransferClick,
                         modifier = Modifier
@@ -194,10 +211,51 @@ fun MisCuentasScreen(
             }
         }
     }
+
+    // ---------- Bottom Sheet ----------
+    if (mostrarSheet) {
+        NuevaTransaccionSheet(
+            onDismiss = { mostrarSheet = false },
+            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
+            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onAgregarManual = { mostrarSheet = false; onNavigate("detalle_movimiento") },
+            onTransferir = { mostrarSheet = false; onNavigate("transferir") }
+        )
+    }
 }
 
 // ============================================================
-// Componentes internos
+// Mapeo DTO → Visual
+// ============================================================
+
+private fun CuentaDto.toVisual(): CuentaVisual {
+    val esUsd = moneda == "USD"
+
+    val icono: ImageVector = when {
+        esUsd -> Icons.Outlined.Savings
+        nombre?.contains("Ahorro", ignoreCase = true) == true -> Icons.Outlined.Savings
+        nombre?.contains("Sueldo", ignoreCase = true) == true -> Icons.Outlined.AccountBalance
+        else -> Icons.Outlined.CreditCard
+    }
+
+    val iconBg = if (esUsd) FinovaTertiaryFixed.copy(alpha = 0.4f)
+    else FinovaSecondaryContainer.copy(alpha = 0.6f)
+
+    val iconTint = if (esUsd) FinovaTertiary else FinovaSecondary
+
+    return CuentaVisual(
+        titulo = nombre ?: "Cuenta",
+        numero = "•••• ${numeroCuenta?.takeLast(4) ?: "----"}",
+        estado = if (esUsd) "USD" else "Soles",
+        saldo = saldoActual ?: 0.0,
+        icono = icono,
+        iconBg = iconBg,
+        iconTint = iconTint
+    )
+}
+
+// ============================================================
+// Componentes internos (SIN CAMBIOS)
 // ============================================================
 
 @Composable
@@ -268,7 +326,6 @@ private fun CuentaCard(cuenta: CuentaVisual) {
         modifier = Modifier.padding(horizontal = 16.dp),
         padding = 16.dp
     ) {
-        // Fila superior: icono + título + chip "Bancaria"
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
@@ -322,7 +379,6 @@ private fun CuentaCard(cuenta: CuentaVisual) {
 
             Spacer(Modifier.width(8.dp))
 
-            // Chip "Bancaria"
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
@@ -339,7 +395,6 @@ private fun CuentaCard(cuenta: CuentaVisual) {
 
         Spacer(Modifier.height(14.dp))
 
-        // Fila inferior: "Saldo disponible" + monto
         Column {
             Text(
                 text = "Saldo disponible",

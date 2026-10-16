@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,20 +21,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
+import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
 
 // ============================================================
 // FINOVA — Perfil
 // Vertical 1 · feature/perfil
-// Basado en Image 2.html — SOLO VISTA
 // ============================================================
 
 @Composable
 fun PerfilScreen(
     onNavigate: (String) -> Unit
 ) {
+    var mostrarSheet by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { PerfilTopBar() }
+        topBar = { PerfilTopBar() },
+        bottomBar = {
+            BottomNavBar(
+                currentRoute = "perfil",
+                onNavigate = onNavigate,
+                onScanClick = { mostrarSheet = true }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -126,6 +135,17 @@ fun PerfilScreen(
 
             Spacer(Modifier.height(32.dp))
         }
+    }
+
+    // ---------- Bottom Sheet ----------
+    if (mostrarSheet) {
+        NuevaTransaccionSheet(
+            onDismiss = { mostrarSheet = false },
+            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
+            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onAgregarManual = { mostrarSheet = false; onNavigate("detalle_movimiento") },
+            onTransferir = { mostrarSheet = false; onNavigate("transferir") }
+        )
     }
 }
 

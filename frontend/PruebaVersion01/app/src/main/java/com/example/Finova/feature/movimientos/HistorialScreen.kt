@@ -23,17 +23,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
+import com.example.Finova.core.network.dto.MovimientoDto
 import com.example.Finova.core.util.formatSoles
 
 // ============================================================
 // FINOVA — Historial de Movimientos
 // Vertical 3 · feature/movimientos
-// Basado en Image 4.html — SOLO VISTA
 // ============================================================
 
 private data class MovimientoHistorial(
+    val id: Long,
     val titulo: String,
     val subtitulo: String,
     val monto: Double,
@@ -52,90 +54,22 @@ private data class GrupoFecha(
 @Composable
 fun HistorialScreen(
     onNavigate: (String) -> Unit,
-    onMovimientoClick: () -> Unit
+    onMovimientoClick: (Long) -> Unit,
+    viewModel: MovimientosViewModel = viewModel()
 ) {
-    var busqueda by remember { mutableStateOf("") }
-    var filtroSeleccionado by remember { mutableStateOf("Todos") }
+    var mostrarSheet by remember { mutableStateOf(false) }
 
-    val grupos = listOf(
-        GrupoFecha(
-            fecha = "HOY · 28 OCTUBRE",
-            totalDia = -70.30,
-            movimientos = listOf(
-                MovimientoHistorial(
-                    titulo = "Supermercados Metro",
-                    subtitulo = "Alimentación · 14:32",
-                    monto = 45.80,
-                    esIngreso = false,
-                    cuenta = "BCP Débito",
-                    icono = Icons.Outlined.ShoppingCart,
-                    tieneIa = true
-                ),
-                MovimientoHistorial(
-                    titulo = "Starbucks Coffee",
-                    subtitulo = "Café y Salidas · 09:15",
-                    monto = 24.50,
-                    esIngreso = false,
-                    cuenta = "Efectivo",
-                    icono = Icons.Outlined.LocalCafe
-                )
-            )
-        ),
-        GrupoFecha(
-            fecha = "AYER · 27 OCTUBRE",
-            totalDia = 3762.00,
-            movimientos = listOf(
-                MovimientoHistorial(
-                    titulo = "Transferencia Sueldo Empresa SAC",
-                    subtitulo = "Ingreso / Salario · 18:00",
-                    monto = 3800.00,
-                    esIngreso = true,
-                    cuenta = "BCP Ahorros",
-                    icono = Icons.Outlined.Payments
-                ),
-                MovimientoHistorial(
-                    titulo = "Farmacias Inkafarma",
-                    subtitulo = "Salud y Cuidado · 11:20",
-                    monto = 38.00,
-                    esIngreso = false,
-                    cuenta = "Interbank Débito",
-                    icono = Icons.Outlined.Medication,
-                    tieneIa = true
-                )
-            )
-        ),
-        GrupoFecha(
-            fecha = "25 DE OCTUBRE",
-            totalDia = 296.50,
-            movimientos = listOf(
-                MovimientoHistorial(
-                    titulo = "Recibo de Luz Enel",
-                    subtitulo = "Servicios del hogar · 16:45",
-                    monto = 85.00,
-                    esIngreso = false,
-                    cuenta = "BCP Pago Serv.",
-                    icono = Icons.Outlined.Bolt
-                ),
-                MovimientoHistorial(
-                    titulo = "Uber Viaje",
-                    subtitulo = "Transporte · 08:30",
-                    monto = 18.50,
-                    esIngreso = false,
-                    cuenta = "BBVA Crédito",
-                    icono = Icons.Outlined.DirectionsCar
-                ),
-                MovimientoHistorial(
-                    titulo = "Pago de Freelance Diseño",
-                    subtitulo = "Ingreso · 15:10",
-                    monto = 400.00,
-                    esIngreso = true,
-                    cuenta = "Plin / BCP",
-                    icono = Icons.Outlined.Palette,
-                    tieneIa = true
-                )
-            )
-        )
-    )
+    val cargando by viewModel.cargando.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val movimientosDto by viewModel.movimientosFiltrados.collectAsState()
+    val busqueda by viewModel.textoBusqueda.collectAsState()
+    val filtroActual by viewModel.filtroActual.collectAsState()
+
+    // Mapear DTOs a modelo visual
+    val movimientosVisuales = movimientosDto.map { it.toHistorialVisual() }
+
+    // Agrupar por fecha
+    val grupos: List<GrupoFecha> = agruparPorFecha(movimientosVisuales, movimientosDto)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -144,7 +78,7 @@ fun HistorialScreen(
             BottomNavBar(
                 currentRoute = "historial",
                 onNavigate = onNavigate,
-                onScanClick = { onNavigate("escanear") }
+                onScanClick = { mostrarSheet = true }
             )
         }
     ) { padding ->
@@ -197,7 +131,7 @@ fun HistorialScreen(
                     Spacer(Modifier.width(8.dp))
                     BasicTextField(
                         value = busqueda,
-                        onValueChange = { busqueda = it },
+                        onValueChange = { viewModel.actualizarBusqueda(it) },
                         modifier = Modifier.weight(1f),
                         textStyle = FinovaBodyMd.copy(color = FinovaOnSurface),
                         singleLine = true,
@@ -236,32 +170,65 @@ fun HistorialScreen(
                 ) {
                     FilterChipHistorial(
                         texto = "Todos",
-                        seleccionado = filtroSeleccionado == "Todos",
-                        onClick = { filtroSeleccionado = "Todos" }
+                        seleccionado = filtroActual == FiltroMovimiento.TODOS,
+                        onClick = { viewModel.cambiarFiltro(FiltroMovimiento.TODOS) }
                     )
                     FilterChipHistorial(
                         texto = "Gastos",
-                        seleccionado = filtroSeleccionado == "Gastos",
+                        seleccionado = filtroActual == FiltroMovimiento.GASTOS,
                         dotColor = FinovaError,
-                        onClick = { filtroSeleccionado = "Gastos" }
+                        onClick = { viewModel.cambiarFiltro(FiltroMovimiento.GASTOS) }
                     )
                     FilterChipHistorial(
                         texto = "Ingresos",
-                        seleccionado = filtroSeleccionado == "Ingresos",
+                        seleccionado = filtroActual == FiltroMovimiento.INGRESOS,
                         dotColor = FinovaSecondary,
-                        onClick = { filtroSeleccionado = "Ingresos" }
+                        onClick = { viewModel.cambiarFiltro(FiltroMovimiento.INGRESOS) }
                     )
-                    FilterChipHistorial(
-                        texto = "Cuentas (BCP, Efectivo)",
-                        seleccionado = filtroSeleccionado == "Cuentas",
-                        icono = Icons.Outlined.AccountBalance,
-                        onClick = { filtroSeleccionado = "Cuentas" }
-                    )
-                    FilterChipHistorial(
-                        texto = "Rango de fecha",
-                        seleccionado = filtroSeleccionado == "Fecha",
-                        icono = Icons.Outlined.CalendarToday,
-                        onClick = { filtroSeleccionado = "Fecha" }
+                }
+            }
+
+            // ---------- Loading / Error ----------
+            if (cargando) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = FinovaPrimary)
+                    }
+                }
+            }
+
+            error?.let { msg ->
+                item {
+                    Surface(
+                        color = FinovaErrorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = msg,
+                            style = FinovaBodySm,
+                            color = FinovaError,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+            }
+
+            // ---------- Vacío ----------
+            if (!cargando && grupos.isEmpty() && error == null) {
+                item {
+                    Text(
+                        text = "No hay movimientos para mostrar",
+                        style = FinovaBodySm,
+                        color = FinovaOnSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
                     )
                 }
             }
@@ -307,9 +274,10 @@ fun HistorialScreen(
                 }
 
                 items(grupo.movimientos.size) { index ->
+                    val mov = grupo.movimientos[index]
                     MovimientoHistorialRow(
-                        mov = grupo.movimientos[index],
-                        onClick = onMovimientoClick
+                        mov = mov,
+                        onClick = { onMovimientoClick(mov.id) }
                     )
                     Spacer(Modifier.height(4.dp))
                 }
@@ -344,7 +312,146 @@ fun HistorialScreen(
             }
         }
     }
+
+    // ---------- Bottom Sheet ----------
+    if (mostrarSheet) {
+        NuevaTransaccionSheet(
+            onDismiss = { mostrarSheet = false },
+            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
+            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onAgregarManual = { mostrarSheet = false; onNavigate("detalle_movimiento") },
+            onTransferir = { mostrarSheet = false; onNavigate("transferir") }
+        )
+    }
 }
+
+// ============================================================
+// Mapeo DTO → modelo visual
+// ============================================================
+
+private fun MovimientoDto.toHistorialVisual(): MovimientoHistorial {
+    val esIngreso = tipoMovimiento == "INGRESO"
+
+    val icono: ImageVector = when {
+        tipoMovimiento == "TRANSFERENCIA" -> Icons.Outlined.SwapHoriz
+        tipoMovimiento == "APORTE_META" -> Icons.Outlined.Savings
+        tipoMovimiento == "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
+        categoriaNombre?.contains("Alimenta", ignoreCase = true) == true -> Icons.Outlined.ShoppingCart
+        categoriaNombre?.contains("Salud", ignoreCase = true) == true -> Icons.Outlined.Medication
+        categoriaNombre?.contains("Transporte", ignoreCase = true) == true -> Icons.Outlined.DirectionsCar
+        categoriaNombre?.contains("Servicios", ignoreCase = true) == true -> Icons.Outlined.Bolt
+        categoriaNombre?.contains("Salario", ignoreCase = true) == true -> Icons.Outlined.Payments
+        esIngreso -> Icons.Outlined.SouthWest
+        else -> Icons.Outlined.Receipt
+    }
+
+    val hora = extraerHora(fechaMovimiento)
+
+    val subtitulo = buildString {
+        if (!categoriaNombre.isNullOrBlank()) append(categoriaNombre)
+        if (hora.isNotBlank()) {
+            if (isNotEmpty()) append(" · ")
+            append(hora)
+        }
+    }
+
+    return MovimientoHistorial(
+        id = id,
+        titulo = descripcion ?: "Movimiento",
+        subtitulo = subtitulo,
+        monto = monto ?: 0.0,
+        esIngreso = esIngreso,
+        cuenta = cuentaOrigenNombre ?: cuentaDestinoNombre ?: "",
+        icono = icono,
+        tieneIa = false
+    )
+}
+
+// Extrae "HH:mm" de "2025-01-15T14:32:00" sin usar java.time
+private fun extraerHora(fechaISO: String?): String {
+    if (fechaISO.isNullOrBlank()) return ""
+    return try {
+        val partes = fechaISO.split("T")
+        if (partes.size < 2) return ""
+        partes[1].take(5)
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+// ============================================================
+// Agrupar por fecha
+// ============================================================
+
+private fun agruparPorFecha(
+    visuales: List<MovimientoHistorial>,
+    dtos: List<MovimientoDto>
+): List<GrupoFecha> {
+
+    val fechaPorId = dtos.associate { it.id to it.fechaMovimiento }
+
+    val map = mutableMapOf<String, MutableList<MovimientoHistorial>>()
+    visuales.forEach { mov ->
+        val fecha = fechaPorId[mov.id]?.take(10) ?: "Sin fecha"
+        map.getOrPut(fecha) { mutableListOf() }.add(mov)
+    }
+
+    return map.map { (fecha, lista) ->
+        val totalDia = lista.sumOf { if (it.esIngreso) it.monto else -it.monto }
+        GrupoFecha(
+            fecha = formatearEtiquetaFecha(fecha),
+            totalDia = totalDia,
+            movimientos = lista
+        )
+    }.sortedByDescending { it.fecha }
+}
+
+// Formatea "2025-01-15" a "HOY · 15 ENE" sin java.time
+private fun formatearEtiquetaFecha(fechaISO: String): String {
+    return try {
+        val partes = fechaISO.split("-")
+        if (partes.size < 3) return fechaISO.uppercase()
+
+        val anio = partes[0].toInt()
+        val mes = partes[1].toInt()
+        val dia = partes[2].toInt()
+
+        val meses = listOf(
+            "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+            "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"
+        )
+        val mesNombre = if (mes in 1..12) meses[mes - 1] else ""
+
+        // Calcular hoy
+        val calHoy = java.util.Calendar.getInstance()
+        val anioHoy = calHoy.get(java.util.Calendar.YEAR)
+        val mesHoy = calHoy.get(java.util.Calendar.MONTH) + 1
+        val diaHoy = calHoy.get(java.util.Calendar.DAY_OF_MONTH)
+
+        val esHoy = anio == anioHoy && mes == mesHoy && dia == diaHoy
+
+        // Calcular ayer
+        val calAyer = java.util.Calendar.getInstance()
+        calAyer.add(java.util.Calendar.DAY_OF_MONTH, -1)
+        val anioAyer = calAyer.get(java.util.Calendar.YEAR)
+        val mesAyer = calAyer.get(java.util.Calendar.MONTH) + 1
+        val diaAyer = calAyer.get(java.util.Calendar.DAY_OF_MONTH)
+
+        val esAyer = anio == anioAyer && mes == mesAyer && dia == diaAyer
+
+        when {
+            esHoy -> "HOY · $dia $mesNombre"
+            esAyer -> "AYER · $dia $mesNombre"
+            else -> "$dia DE $mesNombre"
+        }
+    } catch (e: Exception) {
+        fechaISO.uppercase()
+    }
+}
+
+// ============================================================
+// Componentes internos
+// ============================================================
 
 @Composable
 private fun HistorialTopBar() {

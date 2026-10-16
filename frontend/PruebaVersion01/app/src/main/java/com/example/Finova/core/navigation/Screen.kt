@@ -9,26 +9,25 @@ sealed class Screen(val route: String) {
     object MisCuentas : Screen("mis_cuentas")
     object Transferir : Screen("transferir")
     object Historial : Screen("historial")
-    object DetalleMovimiento : Screen("detalle_movimiento")
+
+    // ✅ Detalle con parámetro {movimientoId}
+    object DetalleMovimiento : Screen("detalle_movimiento/{movimientoId}") {
+        fun createRoute(movimientoId: Long) = "detalle_movimiento/$movimientoId"
+    }
+
     object Estadisticas : Screen("estadisticas")
+    object Metas : Screen("metas")
+    object AnadirFondos : Screen("anadir_fondos")
     object Perfil : Screen("perfil")
     object MisDatos : Screen("mis_datos")
     object Escanear : Screen("escanear")
+    object ComprobanteRevision : Screen("comprobante_revision")
 
     companion object {
         val values = listOf(
-            Splash,
-            Login,
-            Registro,
-            Dashboard,
-            MisCuentas,
-            Transferir,
-            Historial,
-            DetalleMovimiento,
-            Estadisticas,
-            Perfil,
-            MisDatos,
-            Escanear
+            Splash, Login, Registro, Dashboard, MisCuentas, Transferir,
+            Historial, DetalleMovimiento, Estadisticas, Metas, AnadirFondos,
+            Perfil, MisDatos, Escanear, ComprobanteRevision
         )
     }
 }

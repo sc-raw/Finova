@@ -2,21 +2,38 @@ package com.example.Finova.core.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+
+// Auth
 import com.example.Finova.feature.auth.LoginScreen
 import com.example.Finova.feature.auth.RegistroScreen
 import com.example.Finova.feature.auth.SplashScreen
+
+// Inicio y Cuentas
+import com.example.Finova.feature.inicio.DashboardScreen
 import com.example.Finova.feature.cuentas.MisCuentasScreen
 import com.example.Finova.feature.cuentas.TransferirScreen
-import com.example.Finova.feature.escaneo.EscanearScreen
-import com.example.Finova.feature.estadisticas.EstadisticasScreen
-import com.example.Finova.feature.inicio.DashboardScreen
-import com.example.Finova.feature.movimientos.DetalleMovimientoScreen
+
+// Movimientos
 import com.example.Finova.feature.movimientos.HistorialScreen
-import com.example.Finova.feature.perfil.MisDatosScreen
+import com.example.Finova.feature.movimientos.DetalleMovimientoScreen
+
+// Escaneo
+import com.example.Finova.feature.escaneo.EscanearScreen
+import com.example.Finova.feature.escaneo.ComprobanteRevisionScreen
+
+// Estadísticas / Metas
+import com.example.Finova.feature.estadisticas.EstadisticasScreen
+import com.example.Finova.feature.estadisticas.MetasScreen
+import com.example.Finova.feature.estadisticas.AnadirFondosScreen
+
+// Perfil
 import com.example.Finova.feature.perfil.PerfilScreen
+import com.example.Finova.feature.perfil.MisDatosScreen
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
@@ -33,7 +50,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         navController = navController,
         startDestination = Screen.Splash.route
     ) {
-        // ---------- Auth ----------
+
+        // ---------- AUTH ----------
         composable(Screen.Splash.route) {
             SplashScreen(onTimeout = {
                 navController.navigate(Screen.Login.route) {
@@ -42,17 +60,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             })
         }
         composable(Screen.Login.route) {
-            LoginScreen(
-                onNavigate = goTo
-            )
+            LoginScreen(onNavigate = goTo)
         }
         composable(Screen.Registro.route) {
-            RegistroScreen(
-                onNavigate = goTo
-            )
+            RegistroScreen(onNavigate = goTo)
         }
 
-        // ---------- Vertical 2: Inicio y Cuentas (TU VERTICAL) ----------
+        // ---------- VERTICAL 2: INICIO Y CUENTAS ----------
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onNavigate = goTo,
@@ -67,41 +81,87 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         }
         composable(Screen.Transferir.route) {
             TransferirScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onTransferenciaExitosa = {
+                    navController.navigate(Screen.MisCuentas.route) {
+                        popUpTo(Screen.MisCuentas.route) { inclusive = true }
+                    }
+                }
             )
         }
 
-        // ---------- Vertical 3: Movimientos ----------
+        // ---------- VERTICAL 3: MOVIMIENTOS ----------
         composable(Screen.Historial.route) {
             HistorialScreen(
                 onNavigate = goTo,
-                onMovimientoClick = { goTo(Screen.DetalleMovimiento.route) }
+                onMovimientoClick = { movimientoId ->
+                    navController.navigate(
+                        Screen.DetalleMovimiento.createRoute(movimientoId)
+                    )
+                }
             )
         }
-        composable(Screen.DetalleMovimiento.route) {
+
+        // ✅ Detalle con argumento movimientoId
+        composable(
+            route = "detalle_movimiento/{movimientoId}",
+            arguments = listOf(
+                navArgument("movimientoId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val movimientoId = backStackEntry.arguments?.getLong("movimientoId") ?: 0L
             DetalleMovimientoScreen(
+                movimientoId = movimientoId,
                 onBack = { navController.popBackStack() }
             )
         }
 
-        // ---------- Vertical 1: Perfil (con MisDatos) ----------
+        // ---------- VERTICAL 1: PERFIL ----------
         composable(Screen.Perfil.route) {
-            PerfilScreen(
-                onNavigate = goTo
-            )
+            PerfilScreen(onNavigate = goTo)
         }
         composable(Screen.MisDatos.route) {
-            MisDatosScreen(
-                onBack = { navController.popBackStack() }
+            MisDatosScreen(onBack = { navController.popBackStack() })
+        }
+
+        // ---------- VERTICAL 4: ESCANEO ----------
+        composable(Screen.Escanear.route) {
+            EscanearScreen(
+                onBack = { navController.popBackStack() },
+                onComprobanteCapturado = { goTo(Screen.ComprobanteRevision.route) }
+            )
+        }
+        composable(Screen.ComprobanteRevision.route) {
+            ComprobanteRevisionScreen(
+                onBack = { navController.popBackStack() },
+                onConfirmar = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onDescartar = { navController.popBackStack() }
             )
         }
 
-        // ---------- Otras verticales (placeholders) ----------
+        // ---------- VERTICAL 5: ESTADÍSTICAS Y METAS ----------
         composable(Screen.Estadisticas.route) {
-            EstadisticasScreen { goTo(Screen.Dashboard.route) }
+            EstadisticasScreen(
+                onNavigate = goTo,
+                onBack = { navController.popBackStack() }
+            )
         }
-        composable(Screen.Escanear.route) {
-            EscanearScreen { goTo(Screen.Dashboard.route) }
+        composable(Screen.Metas.route) {
+            MetasScreen(
+                onNavigate = goTo,
+                onAnadirFondos = { goTo(Screen.AnadirFondos.route) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.AnadirFondos.route) {
+            AnadirFondosScreen(
+                onBack = { navController.popBackStack() },
+                onConfirmar = { goTo(Screen.Metas.route) }
+            )
         }
     }
 }

@@ -36,7 +36,7 @@ val finovaNavItems = listOf(
     FinovaNavItem("dashboard",    "Inicio",       Icons.Outlined.Home),
     FinovaNavItem("estadisticas", "Estadísticas", Icons.Outlined.BarChart),
     FinovaNavItem("__fab__",      "",             Icons.Filled.QrCodeScanner),
-    FinovaNavItem("estadisticas", "Metas",        Icons.Outlined.Savings),
+    FinovaNavItem("metas",        "Metas",        Icons.Outlined.Savings), // ✅ CORREGIDO: Ahora apunta a "metas"
     FinovaNavItem("perfil",       "Perfil",       Icons.Outlined.Person)
 )
 

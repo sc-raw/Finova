@@ -17,24 +17,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.theme.*
 
 // ============================================================
 // FINOVA — Registro
 // Vertical 1 · feature/auth
-// Basado en Image 6.html — SOLO VISTA
 // ============================================================
 
 @Composable
 fun RegistroScreen(
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
     var nombre by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
@@ -43,9 +42,27 @@ fun RegistroScreen(
     var mostrarContrasena by remember { mutableStateOf(false) }
     var aceptaTerminos by remember { mutableStateOf(false) }
 
+    val cargando by viewModel.registroCargando.collectAsState()
+    val error by viewModel.registroError.collectAsState()
+    val registroExitoso by viewModel.registroExitoso.collectAsState()
+
+    LaunchedEffect(registroExitoso) {
+        if (registroExitoso) {
+            viewModel.resetearEstados()
+            onNavigate("dashboard")
+        }
+    }
+
     val coinciden = confirmarContrasena.isNotEmpty() &&
             confirmarContrasena == contrasena &&
             confirmarContrasena.length >= 8
+
+    val puedeEnviar = nombre.isNotBlank()
+            && correo.isNotBlank()
+            && contrasena.length >= 8
+            && coinciden
+            && aceptaTerminos
+            && !cargando
 
     Box(
         modifier = Modifier
@@ -87,7 +104,6 @@ fun RegistroScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Logo con punto animado (estático por ahora)
                 Box(
                     modifier = Modifier
                         .size(56.dp)
@@ -235,11 +251,41 @@ fun RegistroScreen(
                     )
                 }
 
+                // ---------- Mensaje de error ----------
+                error?.let {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        color = FinovaErrorContainer,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = it,
+                            style = FinovaBodySm,
+                            color = FinovaError,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(20.dp))
 
                 // ---------- Botón Crear cuenta ----------
                 Button(
-                    onClick = { onNavigate("dashboard") },
+                    onClick = {
+                        // El backend espera nombres y apellidos separados.
+                        // Como aquí hay un solo campo, divido por el primer espacio.
+                        val partes = nombre.trim().split(" ", limit = 2)
+                        val nombres = partes.getOrNull(0) ?: ""
+                        val apellidos = partes.getOrNull(1) ?: ""
+
+                        viewModel.registrar(
+                            nombres = nombres,
+                            apellidos = apellidos,
+                            correo = correo.trim(),
+                            password = contrasena
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -247,18 +293,27 @@ fun RegistroScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = FinovaPrimaryContainer,
                         contentColor = FinovaOnPrimary
-                    )
+                    ),
+                    enabled = puedeEnviar
                 ) {
-                    Text(
-                        text = "Crear cuenta",
-                        style = FinovaLabelLg
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (cargando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = FinovaOnPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Crear cuenta",
+                            style = FinovaLabelLg
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 

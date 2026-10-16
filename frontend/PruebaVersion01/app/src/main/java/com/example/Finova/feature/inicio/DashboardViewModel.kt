@@ -1,112 +1,93 @@
 package com.example.Finova.feature.inicio
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import com.example.Finova.core.network.ApiClient
+import com.example.Finova.core.network.dto.CuentaDto
+import com.example.Finova.core.network.dto.MovimientoDto
+import com.example.Finova.core.util.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// ============================================================
-// FINOVA — Dashboard ViewModel
-// Datos mock por ahora. Cuando el backend esté listo, se
-// reemplaza por llamadas a CuentaRepository / MovimientoRepository.
-// ============================================================
+class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
-data class MovimientoItem(
-    val id: String,
-    val titulo: String,
-    val subtitulo: String,
-    val monto: Double,
-    val esIngreso: Boolean,
-    val cuenta: String,
-    val categoriaIcon: CategoriaIcon,
-    val tieneIa: Boolean = false
-)
+    private val sessionManager = SessionManager(application)
+    private val usuarioId: Long = sessionManager.obtenerUsuarioId()
 
-enum class CategoriaIcon {
-    SUPERMERCADO, TRANSFERENCIA, CAFE, SERVICIO
-}
+    // ============ CUENTAS ============
+    private val _cuentas = MutableStateFlow<List<CuentaDto>>(emptyList())
+    val cuentas: StateFlow<List<CuentaDto>> = _cuentas
 
-data class DashboardUiState(
-    val nombreUsuario: String = "Diego",
-    val mes: String = "Marzo 2025",
-    val saldoTotalSoles: Double = 8450.20,
-    val saldoTotalUsd: Double = 2253.38,
-    val tipoCambio: Double = 3.75,
-    val ingresosMes: Double = 4500.00,
-    val gastosMes: Double = 1820.50,
-    val presupuestoUsadoPct: Int = 74,
-    val presupuestoRestante: Double = 1420.00,
-    val presupuestoTotal: Double = 5500.00,
-    val saldosOcultos: Boolean = false,
-    val movimientos: List<MovimientoItem> = emptyList(),
-    val cargando: Boolean = true
-)
+    // ============ MOVIMIENTOS ============
+    private val _movimientos = MutableStateFlow<List<MovimientoDto>>(emptyList())
+    val movimientos: StateFlow<List<MovimientoDto>> = _movimientos
 
-class DashboardViewModel : ViewModel() {
+    // ============ ESTADOS ============
+    private val _cargando = MutableStateFlow(false)
+    val cargando: StateFlow<Boolean> = _cargando
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
-    val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+    // ============ DATOS DEL USUARIO ============
+    val nombresUsuario: String = sessionManager.obtenerNombres()
+
+    // ============ DATOS CALCULADOS ============
+    val saldoTotalSoles: Double
+        get() = _cuentas.value
+            .filter { it.moneda == "PEN" }
+            .sumOf { it.saldoActual ?: 0.0 }
+
+    val saldoTotalUsd: Double
+        get() = _cuentas.value
+            .filter { it.moneda == "USD" }
+            .sumOf { it.saldoActual ?: 0.0 }
+
+    val ingresosMes: Double
+        get() = _movimientos.value
+            .filter { it.tipoMovimiento == "INGRESO" }
+            .sumOf { it.monto ?: 0.0 }
+
+    val gastosMes: Double
+        get() = _movimientos.value
+            .filter { it.tipoMovimiento == "GASTO" }
+            .sumOf { it.monto ?: 0.0 }
+
+    val tipoCambio: Double = 3.75 // TODO: Puedes traerlo de una API después
 
     init {
-        cargarDatosMock()
+        if (usuarioId != -1L) {
+            cargarDashboard()
+        } else {
+            _error.value = "No hay sesión activa"
+        }
     }
 
-    private fun cargarDatosMock() {
+    fun cargarDashboard() {
         viewModelScope.launch {
-            delay(400) // simula latencia de red
-            _uiState.update {
-                it.copy(
-                    movimientos = listOf(
-                        MovimientoItem(
-                            id = "1",
-                            titulo = "Supermercado Metro",
-                            subtitulo = "Alimentación · Hoy, 13:45",
-                            monto = 142.50,
-                            esIngreso = false,
-                            cuenta = "BCP ••4821",
-                            categoriaIcon = CategoriaIcon.SUPERMERCADO,
-                            tieneIa = true
-                        ),
-                        MovimientoItem(
-                            id = "2",
-                            titulo = "Transferencia Sueldo",
-                            subtitulo = "Salario mensual · Ayer, 09:00",
-                            monto = 3800.00,
-                            esIngreso = true,
-                            cuenta = "BCP Soles",
-                            categoriaIcon = CategoriaIcon.TRANSFERENCIA
-                        ),
-                        MovimientoItem(
-                            id = "3",
-                            titulo = "Starbucks Coffee",
-                            subtitulo = "Café & Salidas · Ayer, 18:20",
-                            monto = 24.50,
-                            esIngreso = false,
-                            cuenta = "Efectivo",
-                            categoriaIcon = CategoriaIcon.CAFE
-                        ),
-                        MovimientoItem(
-                            id = "4",
-                            titulo = "Recibo Luz Enel",
-                            subtitulo = "Servicios del hogar · 18 Feb",
-                            monto = 85.00,
-                            esIngreso = false,
-                            cuenta = "BCP ••4821",
-                            categoriaIcon = CategoriaIcon.SERVICIO
-                        )
-                    ),
-                    cargando = false
-                )
+            _cargando.value = true
+            _error.value = null
+
+            try {
+                _cuentas.value = ApiClient.apiService.listarCuentasPorUsuario(usuarioId)
+                _movimientos.value = ApiClient.apiService.listarMovimientosPorUsuario(usuarioId)
+            } catch (e: Exception) {
+                _error.value = traducirError(e.message)
+            } finally {
+                _cargando.value = false
             }
         }
     }
 
-    /** Alterna visibilidad de saldos (botón del ojo) */
-    fun toggleSaldos() {
-        _uiState.update { it.copy(saldosOcultos = !it.saldosOcultos) }
+    private fun traducirError(mensaje: String?): String {
+        return when {
+            mensaje == null -> "Error desconocido"
+            mensaje.contains("Connection refused") -> "No se pudo conectar al servidor"
+            mensaje.contains("Unable to resolve host") -> "Sin conexión a Internet"
+            mensaje.contains("401") -> "Sesión expirada"
+            else -> mensaje
+        }
     }
 }

@@ -1,7 +1,6 @@
 package com.example.Finova.feature.cuentas
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -26,17 +25,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.FinovaCard
 import com.example.Finova.core.design.theme.*
+import com.example.Finova.core.network.dto.CuentaDto
 import com.example.Finova.core.util.formatSoles
 
 // ============================================================
 // FINOVA — Transferir
 // Vertical 2 · feature/cuentas
-// Basado en Image 2.html — SOLO VISTA
 // ============================================================
 
 private data class CuentaTransfer(
+    val id: Long,
     val titulo: String,
     val numero: String,
     val saldo: Double,
@@ -45,29 +46,39 @@ private data class CuentaTransfer(
 
 @Composable
 fun TransferirScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTransferenciaExitosa: () -> Unit = {},
+    viewModel: CuentasViewModel = viewModel()
 ) {
-    // --- Datos hardcodeados ---
-    var origen by remember {
-        mutableStateOf(
-            CuentaTransfer(
-                titulo = "BCP Soles - Sueldo",
-                numero = "•••• 4821",
-                saldo = 5820.00,
-                esOrigen = true
-            )
-        )
+    // --- Datos del ViewModel ---
+    val cuentasDto by viewModel.cuentas.collectAsState()
+    val cargandoTransfer by viewModel.transferenciaCargando.collectAsState()
+    val errorTransfer by viewModel.transferenciaError.collectAsState()
+    val exitosoTransfer by viewModel.transferenciaExitosa.collectAsState()
+
+    // --- Convertir DTOs a modelo visual ---
+    val cuentasVisuales: List<CuentaTransfer> = cuentasDto.map { it.toCuentaTransfer() }
+
+    // --- Estado: cuentas seleccionadas ---
+    var cuentaOrigenId by remember { mutableStateOf<Long?>(null) }
+    var cuentaDestinoId by remember { mutableStateOf<Long?>(null) }
+
+    // --- Inicializar con las primeras cuentas cuando carguen ---
+    LaunchedEffect(cuentasVisuales.size) {
+        if (cuentasVisuales.isNotEmpty()) {
+            if (cuentaOrigenId == null) cuentaOrigenId = cuentasVisuales[0].id
+            if (cuentaDestinoId == null && cuentasVisuales.size > 1) {
+                cuentaDestinoId = cuentasVisuales[1].id
+            }
+        }
     }
-    var destino by remember {
-        mutableStateOf(
-            CuentaTransfer(
-                titulo = "BCP Soles - Ahorros",
-                numero = "•••• 9023",
-                saldo = 2437.50,
-                esOrigen = false
-            )
-        )
-    }
+
+    val origen: CuentaTransfer? = cuentasVisuales.find { it.id == cuentaOrigenId }
+        ?.copy(esOrigen = true)
+    val destino: CuentaTransfer? = cuentasVisuales.find { it.id == cuentaDestinoId }
+        ?.copy(esOrigen = false)
+
+    // --- Otros estados ---
     var monto by remember { mutableStateOf("") }
     var concepto by remember { mutableStateOf("") }
     var rotacionSwap by remember { mutableFloatStateOf(0f) }
@@ -75,9 +86,12 @@ fun TransferirScreen(
     var toastMensaje by remember { mutableStateOf("") }
     var toastEsError by remember { mutableStateOf(false) }
 
+    var dropdownOrigenAbierto by remember { mutableStateOf(false) }
+    var dropdownDestinoAbierto by remember { mutableStateOf(false) }
+
     val montoDouble = monto.toDoubleOrNull() ?: 0.0
-    val excedeSaldo = montoDouble > origen.saldo
-    val saldoRestante = origen.saldo - montoDouble
+    val excedeSaldo = origen != null && montoDouble > origen.saldo
+    val saldoRestante = (origen?.saldo ?: 0.0) - montoDouble
 
     // --- Toast helper ---
     fun mostrarMensaje(msg: String, esError: Boolean = false) {
@@ -91,6 +105,23 @@ fun TransferirScreen(
         if (mostrarToast) {
             kotlinx.coroutines.delay(2600)
             mostrarToast = false
+        }
+    }
+
+    // --- Reaccionar al resultado de la transferencia ---
+    LaunchedEffect(exitosoTransfer) {
+        if (exitosoTransfer) {
+            mostrarMensaje("¡Transferiste ${formatSoles(montoDouble)}!")
+            viewModel.resetearTransferencia()
+            monto = ""
+            concepto = ""
+        }
+    }
+
+    LaunchedEffect(errorTransfer) {
+        errorTransfer?.let {
+            mostrarMensaje(it, esError = true)
+            viewModel.resetearTransferencia()
         }
     }
 
@@ -138,18 +169,44 @@ fun TransferirScreen(
                 Spacer(Modifier.height(16.dp))
 
                 // ---------- Card origen / swap / destino ----------
-                CuentasCard(
-                    origen = origen,
-                    destino = destino,
-                    rotacionSwap = rotacionSwap,
-                    onSwap = {
-                        rotacionSwap += 180f
-                        val temp = origen
-                        origen = destino.copy(esOrigen = true)
-                        destino = temp.copy(esOrigen = false)
-                        mostrarMensaje("Cuentas alternadas")
+                if (origen != null && destino != null) {
+                    CuentasCard(
+                        origen = origen,
+                        destino = destino,
+                        rotacionSwap = rotacionSwap,
+                        onSwap = {
+                            rotacionSwap += 180f
+                            val tempId = cuentaOrigenId
+                            cuentaOrigenId = cuentaDestinoId
+                            cuentaDestinoId = tempId
+                            mostrarMensaje("Cuentas alternadas")
+                        },
+                        onOrigenClick = { dropdownOrigenAbierto = true },
+                        onDestinoClick = { dropdownDestinoAbierto = true }
+                    )
+                } else if (cuentasVisuales.size < 2) {
+                    Surface(
+                        color = FinovaSurfaceContainerLow,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Necesitas al menos 2 cuentas para transferir",
+                            style = FinovaBodyMd,
+                            color = FinovaOnSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
-                )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = FinovaPrimary)
+                    }
+                }
 
                 Spacer(Modifier.height(16.dp))
 
@@ -160,10 +217,12 @@ fun TransferirScreen(
                     excedeSaldo = excedeSaldo,
                     onChipClick = { incremento ->
                         val actual = monto.toDoubleOrNull() ?: 0.0
-                        monto = (actual + incremento).toBigDecimal().stripTrailingZeros().toPlainString()
+                        monto = (actual + incremento).toBigDecimal()
+                            .stripTrailingZeros().toPlainString()
                     },
                     onTodo = {
-                        monto = origen.saldo.toBigDecimal().stripTrailingZeros().toPlainString()
+                        monto = (origen?.saldo ?: 0.0).toBigDecimal()
+                            .stripTrailingZeros().toPlainString()
                     }
                 )
 
@@ -187,9 +246,23 @@ fun TransferirScreen(
                 Button(
                     onClick = {
                         when {
-                            montoDouble <= 0 -> mostrarMensaje("Ingresa un monto válido", true)
-                            excedeSaldo -> mostrarMensaje("Fondos insuficientes", true)
-                            else -> mostrarMensaje("¡Transferiste ${formatSoles(montoDouble)}!")
+                            origen == null || destino == null -> {
+                                mostrarMensaje("Selecciona las cuentas", true)
+                            }
+                            montoDouble <= 0 -> {
+                                mostrarMensaje("Ingresa un monto válido", true)
+                            }
+                            excedeSaldo -> {
+                                mostrarMensaje("Fondos insuficientes", true)
+                            }
+                            else -> {
+                                viewModel.transferir(
+                                    cuentaOrigenId = origen.id,
+                                    cuentaDestinoId = destino.id,
+                                    monto = montoDouble,
+                                    descripcion = concepto
+                                )
+                            }
                         }
                     },
                     modifier = Modifier
@@ -199,18 +272,27 @@ fun TransferirScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = FinovaPrimaryContainer,
                         contentColor = FinovaOnPrimary
-                    )
+                    ),
+                    enabled = !cargandoTransfer
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Transferir Ahora",
-                        style = FinovaLabelLg
-                    )
+                    if (cargandoTransfer) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = FinovaOnPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Transferir Ahora",
+                            style = FinovaLabelLg
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(8.dp))
@@ -236,14 +318,58 @@ fun TransferirScreen(
             }
         }
 
+        // ---------- Dropdown Origen ----------
+        DropdownMenu(
+            expanded = dropdownOrigenAbierto,
+            onDismissRequest = { dropdownOrigenAbierto = false }
+        ) {
+            cuentasVisuales.forEach { c ->
+                DropdownMenuItem(
+                    text = {
+                        Text("${c.titulo} - ${formatSoles(c.saldo)}")
+                    },
+                    onClick = {
+                        if (c.id != cuentaDestinoId) {
+                            cuentaOrigenId = c.id
+                        } else {
+                            mostrarMensaje("La cuenta origen no puede ser igual a la destino", true)
+                        }
+                        dropdownOrigenAbierto = false
+                    }
+                )
+            }
+        }
+
+        // ---------- Dropdown Destino ----------
+        DropdownMenu(
+            expanded = dropdownDestinoAbierto,
+            onDismissRequest = { dropdownDestinoAbierto = false }
+        ) {
+            cuentasVisuales
+                .filter { it.id != cuentaOrigenId }
+                .forEach { c ->
+                    DropdownMenuItem(
+                        text = {
+                            Text("${c.titulo} - ${formatSoles(c.saldo)}")
+                        },
+                        onClick = {
+                            cuentaDestinoId = c.id
+                            dropdownDestinoAbierto = false
+                        }
+                    )
+                }
+        }
+
         // ---------- Toast ----------
         androidx.compose.animation.AnimatedVisibility(
             visible = mostrarToast,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp, start = 16.dp, end = 16.dp),
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { it }),
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(targetOffsetY = { it })
+            enter = androidx.compose.animation.fadeIn() +
+                    androidx.compose.animation.slideInVertically(initialOffsetY = { it }),
+            exit = androidx.compose.animation.fadeOut() +
+                    androidx.compose.animation.slideOutVertically(targetOffsetY = { it })
         ) {
             Surface(
                 color = FinovaInverseSurface,
@@ -275,6 +401,20 @@ fun TransferirScreen(
 }
 
 // ============================================================
+// Mapeo DTO → modelo de la vista
+// ============================================================
+
+private fun CuentaDto.toCuentaTransfer(): CuentaTransfer {
+    return CuentaTransfer(
+        id = id,
+        titulo = nombre ?: "Cuenta",
+        numero = "•••• ${numeroCuenta?.takeLast(4) ?: "----"}",
+        saldo = saldoActual ?: 0.0,
+        esOrigen = true
+    )
+}
+
+// ============================================================
 // Componentes internos
 // ============================================================
 
@@ -299,7 +439,7 @@ private fun TransferirTopBar(onBack: () -> Unit) {
             }
             Spacer(Modifier.width(4.dp))
             Text(
-                text = "Detalle De Movimiento",
+                text = "Transferir",
                 style = FinovaTitleMd,
                 color = FinovaOnSurface,
                 modifier = Modifier.weight(1f)
@@ -320,7 +460,9 @@ private fun CuentasCard(
     origen: CuentaTransfer,
     destino: CuentaTransfer,
     rotacionSwap: Float,
-    onSwap: () -> Unit
+    onSwap: () -> Unit,
+    onOrigenClick: () -> Unit,
+    onDestinoClick: () -> Unit
 ) {
     FinovaCard(padding = 16.dp) {
 
@@ -361,7 +503,7 @@ private fun CuentasCard(
 
         Spacer(Modifier.height(8.dp))
 
-        CuentaRow(cuenta = origen, esOrigen = true)
+        CuentaRow(cuenta = origen, esOrigen = true, onClick = onOrigenClick)
 
         // --- Botón swap ---
         Box(
@@ -427,18 +569,22 @@ private fun CuentasCard(
 
         Spacer(Modifier.height(8.dp))
 
-        CuentaRow(cuenta = destino, esOrigen = false)
+        CuentaRow(cuenta = destino, esOrigen = false, onClick = onDestinoClick)
     }
 }
 
 @Composable
-private fun CuentaRow(cuenta: CuentaTransfer, esOrigen: Boolean) {
+private fun CuentaRow(
+    cuenta: CuentaTransfer,
+    esOrigen: Boolean,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(FinovaSurfaceContainerLow)
-            .clickable { }
+            .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -533,7 +679,6 @@ private fun MontoCard(
 
         Spacer(Modifier.height(8.dp))
 
-        // --- Input grande ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -553,7 +698,6 @@ private fun MontoCard(
                 BasicTextField(
                     value = monto,
                     onValueChange = { nuevo ->
-                        // solo dígitos y un punto
                         if (nuevo.isEmpty() || nuevo.matches(Regex("^\\d*\\.?\\d*$"))) {
                             onMontoChange(nuevo)
                         }
@@ -587,7 +731,6 @@ private fun MontoCard(
 
         Spacer(Modifier.height(8.dp))
 
-        // --- Chips rápidos ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -598,7 +741,6 @@ private fun MontoCard(
             QuickChip("Todo", Modifier.weight(1f), destacado = true, onClick = onTodo)
         }
 
-        // --- Warning de saldo ---
         if (excedeSaldo) {
             Spacer(Modifier.height(8.dp))
             Row(

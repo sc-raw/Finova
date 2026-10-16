@@ -24,22 +24,34 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
 
 // ============================================================
 // FINOVA — Login
 // Vertical 1 · feature/auth
-// Basado en Image 2.html — SOLO VISTA
 // ============================================================
 
 @Composable
 fun LoginScreen(
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var mostrarContrasena by remember { mutableStateOf(false) }
+
+    val cargando by viewModel.loginCargando.collectAsState()
+    val error by viewModel.loginError.collectAsState()
+    val loginExitoso by viewModel.loginExitoso.collectAsState()
+
+    LaunchedEffect(loginExitoso) {
+        if (loginExitoso) {
+            viewModel.resetearEstados()
+            onNavigate("dashboard")
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -133,9 +145,28 @@ fun LoginScreen(
 
                 Spacer(Modifier.height(16.dp))
 
+                // ---------- Mensaje de error ----------
+                error?.let {
+                    Surface(
+                        color = FinovaErrorContainer,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = it,
+                            style = FinovaBodySm,
+                            color = FinovaError,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 // ---------- Botón Iniciar sesión ----------
                 Button(
-                    onClick = { onNavigate("dashboard") },
+                    onClick = {
+                        viewModel.login(correo.trim(), contrasena)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -143,18 +174,27 @@ fun LoginScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = FinovaPrimary,
                         contentColor = FinovaOnPrimary
-                    )
+                    ),
+                    enabled = !cargando
                 ) {
-                    Text(
-                        text = "Iniciar sesión",
-                        style = FinovaLabelLg
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    if (cargando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = FinovaOnPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Iniciar sesión",
+                            style = FinovaLabelLg
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
@@ -207,7 +247,6 @@ fun FinovaLogo(
             style = FinovaDisplayLgMobile,
             color = FinovaOnPrimary
         )
-        // Punto decorativo arriba a la derecha
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)

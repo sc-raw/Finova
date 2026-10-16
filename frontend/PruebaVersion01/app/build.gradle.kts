@@ -37,8 +37,8 @@ android {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
-
 dependencies {
+    // Básicas
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
@@ -46,27 +46,25 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 
-    // --- Compose Navigation ---
+    // Compose
     implementation(libs.androidx.navigation.compose)
-
-    // --- Material Icons Extended ---
     implementation(libs.androidx.material.icons.extended)
-
-    // --- Jetpack Compose Integration ---
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-
-    // --- ViewModel para Compose ---
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // --- Retrofit & Gson ---
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
+    // Retrofit + OkHttp (HARDCODEADO, así ya funciona sin tocar el catálogo)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
 
-    // --- ML Kit Text Recognition ---
+    // ML Kit
     implementation(libs.play.services.mlkit.text.recognition)
 }
