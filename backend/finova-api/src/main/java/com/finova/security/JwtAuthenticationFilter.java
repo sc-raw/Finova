@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 @Component
 @RequiredArgsConstructor
@@ -20,7 +19,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    protected void doFilterInternal1(
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getServletPath();
+        String method = request.getMethod();
+        
+        // El filtro se salta si es el login, o si es un intento de registrar un usuario (POST)
+        return path.startsWith("/api/usuarios/login") || (path.equals("/api/usuarios") && "POST".equalsIgnoreCase(method));
+    }
+
+
+    @Override
+    protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
@@ -30,54 +40,42 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String userEmail;
 
-        // Si no hay header de autorización o no empieza con "Bearer ", continúa
+        // Si no se envía cabecera o no tiene el formato clásico de Bearer, continúa el flujo normal
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Extraer el token (quita el "Bearer ")
+        // Extraer la cadena pura del token JWT
         jwt = authHeader.substring(7);
 
         try {
-            // Extraer el email del token
             userEmail = jwtService.extractUsername(jwt);
 
-            // Si el email existe y no hay autenticación en el contexto
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                
-                // Validar el token
                 if (jwtService.isTokenValid(jwt)) {
                     Long usuarioId = jwtService.extractUsuarioId(jwt);
 
-                    // Crear el objeto de autenticación
+                    // Crear el objeto de autenticación con el rol oficial de Spring Security
                     UsernamePasswordAuthenticationToken authToken = 
                             new UsernamePasswordAuthenticationToken(
                                     userEmail,
-                                    usuarioId,
-                                    new ArrayList<>()
+                                    null, 
+                                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_USER")
                             );
 
                     authToken.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request)
                     );
 
-                    // Establecer la autenticación en el contexto de Spring
+                    // Registrar de forma exitosa la sesión en el contexto de seguridad
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
-            // Si el token es inválido, simplemente continúa sin autenticar
             logger.error("Cannot set user authentication: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);
     }
-
-	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-			throws ServletException, IOException {
-		// TODO Auto-generated method stub
-		
-	}
 }
