@@ -1,4 +1,3 @@
-
 package com.finova.security;
 
 import io.jsonwebtoken.Claims;
@@ -10,52 +9,65 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.function.Function;
 
 @Service
 public class JwtService {
 
-    @Value("${finova.jwt.secret}")
-    private String secret;
+    @Value("${jwt.secret}")
+    private String secretKey;
 
-    @Value("${finova.jwt.expiration}")
+    @Value("${jwt.expiration}")
     private long expiration;
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = java.util.Base64.getDecoder().decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    public String generarToken(String correo) {
-        Date ahora = new Date();
-        Date expiracionToken = new Date(ahora.getTime() + expiration);
-
+    public String generateToken(Long usuarioId, String correo) {
         return Jwts.builder()
                 .subject(correo)
-                .issuedAt(ahora)
-                .expiration(expiracionToken)
-                .signWith(getSigningKey())
+                .claim("usuarioId", usuarioId)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
-    public String obtenerCorreo(String token) {
-        return extraerClaims(token).getSubject();
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
     }
 
-    public boolean esTokenValido(String token, String correo) {
+    public Long extractUsuarioId(String token) {
+        return extractClaim(token, claims -> {
+            Object id = claims.get("usuarioId");
+            if (id instanceof Number) {
+                return ((Number) id).longValue();
+            }
+            return null;
+        });
+    }
+
+    public boolean isTokenValid(String token) {
         try {
-            Claims claims = extraerClaims(token);
-            return claims.getSubject().equals(correo)
-                    && claims.getExpiration().after(new Date());
+            Claims claims = extractAllClaims(token);
+            return !claims.getExpiration().before(new Date());
         } catch (Exception e) {
             return false;
         }
     }
 
-    private Claims extraerClaims(String token) {
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    private Claims extractAllClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

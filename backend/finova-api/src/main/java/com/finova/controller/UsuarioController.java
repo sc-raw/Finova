@@ -78,24 +78,24 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(
-            @RequestBody LoginRequestDTO request) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO request) {
+        // 1. Validar credenciales contra la base de datos
+        Usuario usuario = usuarioService.login(request.getCorreo(), request.getPassword());
 
-        Usuario usuario = usuarioService.login(
-                request.getCorreo(),
-                request.getPassword()
-        );
+        // 2. Generar el token JWT pasando el ID (Long) y el Correo (String)
+        String token = jwtService.generateToken(usuario.getId(), usuario.getCorreo());
 
-        String token = jwtService.generarToken(usuario.getCorreo());
-
+        // 3. Crear la respuesta con los datos limpios estructurados
         LoginResponseDTO respuesta = new LoginResponseDTO(
-                token,
-                "Bearer",
-                UsuarioResponseDTO.desdeEntidad(usuario)
+                usuario.getId(),
+                usuario.getNombres(),
+                usuario.getCorreo(),
+                token
         );
 
         return ResponseEntity.ok(respuesta);
     }
+
 
     @PutMapping("/{id}/password")
     public ResponseEntity<Void> cambiarPassword(
