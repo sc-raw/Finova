@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+   // id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -58,13 +59,22 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Retrofit + OkHttp (HARDCODEADO, así ya funciona sin tocar el catálogo)
+    // Retrofit + OkHttp + Coroutines para conexión con Spring Boot
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Ciclo de vida y ViewModels para persistencia de datos en UI
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
 
     // ML Kit
     implementation(libs.play.services.mlkit.text.recognition)
+
+
+
+
+
 }

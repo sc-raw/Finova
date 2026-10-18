@@ -8,16 +8,32 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    // 10.0.2.2 = localhost desde el emulador de Android
-    // Si usas celular físico, cambia esto por la IP de tu PC (ej: 192.168.1.50)
-    private const val BASE_URL = "http://10.0.2.2:8080/"
+    private const val BASE_URL = "http://192.168.0.190:8080/"
+
+    // 🛠️ PUENTE DINÁMICO: Variable global en memoria para inyectar el JWT Token
+    var tokenDinamico: String? = null
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY  // Muestra el JSON completo en Logcat
+        level = HttpLoggingInterceptor.Level.BODY
     }
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
+        // 🔒 INTERCEPTOR AUTOMÁTICO DE JWT
+        .addInterceptor { chain ->
+            val requestOriginal = chain.request()
+
+            // Si el token dinámico tiene contenido, lo inyectamos en la cabecera Authorization
+            val nuevaPeticion = if (!tokenDinamico.isNullOrBlank()) {
+                requestOriginal.newBuilder()
+                    .addHeader("Authorization", "Bearer $tokenDinamico")
+                    .build()
+            } else {
+                requestOriginal
+            }
+
+            chain.proceed(nuevaPeticion)
+        }
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

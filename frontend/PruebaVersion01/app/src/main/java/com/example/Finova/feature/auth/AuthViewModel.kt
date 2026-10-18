@@ -46,18 +46,33 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _loginError.value = null
 
             try {
-                val response = repository.login(correo.trim(), password)
-                val usuario = response.usuario
+               val response = repository.login(correo.trim(), password)
+              //  val usuario = response.usuario
+              //  val token = response.token
+        //Despues
+                val idUsuario = response.id
+                val nombresUsuario = response.nombres
+                val correoUsuario = response.correo
                 val token = response.token
 
-                if (usuario != null && token != null) {
+                if (idUsuario != null && token != null) {
                     sessionManager.guardarSesion(
-                        usuarioId = usuario.id,
-                        nombres = usuario.nombres ?: "",
-                        apellidos = usuario.apellidos ?: "",
-                        correo = usuario.correo ?: "",
+                        usuarioId = idUsuario,
+                        nombres = nombresUsuario ?: "",
+                        apellidos = "", // Tu backend no devuelve apellidos en el login, pasamos vacío
+                        correo = correoUsuario ?: "",
                         token = token
                     )
+                    //Antes
+                //if (usuario != null && token != null) {
+                    //sessionManager.guardarSesion(
+                        //usuarioId = usuario.id,
+                        //nombres = usuario.nombres ?: "",
+                       // apellidos = usuario.apellidos ?: "",
+                      //  correo = usuario.correo ?: "",
+                      //  token = token
+                    //)
+
                     _loginExitoso.value = true
                 } else {
                     _loginError.value = "Respuesta del servidor inválida"
@@ -67,6 +82,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 _loginCargando.value = false
             }
+
         }
     }
 

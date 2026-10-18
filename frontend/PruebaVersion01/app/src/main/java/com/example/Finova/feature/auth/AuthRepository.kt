@@ -8,25 +8,25 @@ import com.example.Finova.core.network.dto.UsuarioDto
 
 class AuthRepository {
 
+    // 1. Aseguramos que llame a .login() pasándole el DTO correcto
     suspend fun login(correo: String, password: String): LoginResponseDto {
-        return ApiClient.apiService.login(
-            LoginRequestDto(correo = correo, password = password)
-        )
+        val request = LoginRequestDto(correo = correo, password = password)
+        return ApiClient.apiService.login(request)
     }
 
+    // 2. Aseguramos que llame a .registrar() pasándole el DTO correcto
     suspend fun registrar(
         nombres: String,
         apellidos: String,
         correo: String,
         password: String
     ): UsuarioDto {
-        return ApiClient.apiService.registrar(
-            RegistroRequestDto(
-                nombres = nombres,
-                apellidos = apellidos,
-                correo = correo,
-                password = password
-            )
+        val request = RegistroRequestDto(
+            nombres = nombres,
+            apellidos = apellidos,
+            correo = correo,
+            password = password
         )
+        return ApiClient.apiService.registrar(request)
     }
 }
