@@ -35,7 +35,8 @@ fun RegistroScreen(
     onNavigate: (String) -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
-    var nombre by remember { mutableStateOf("") }
+    var nombres by remember { mutableStateOf("") }
+    var apellidos by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var confirmarContrasena by remember { mutableStateOf("") }
@@ -49,7 +50,7 @@ fun RegistroScreen(
     LaunchedEffect(registroExitoso) {
         if (registroExitoso) {
             viewModel.resetearEstados()
-            onNavigate("dashboard")
+            onNavigate("login")
         }
     }
 
@@ -57,7 +58,8 @@ fun RegistroScreen(
             confirmarContrasena == contrasena &&
             confirmarContrasena.length >= 8
 
-    val puedeEnviar = nombre.isNotBlank()
+    val puedeEnviar = nombres.isNotBlank()
+            && apellidos.isNotBlank()
             && correo.isNotBlank()
             && contrasena.length >= 8
             && coinciden
@@ -143,12 +145,23 @@ fun RegistroScreen(
                     .background(FinovaSurfaceContainerLowest)
                     .padding(16.dp)
             ) {
-                // Nombre
+                // Nombres
                 CampoRegistro(
-                    label = "Nombre completo",
-                    valor = nombre,
-                    onValorChange = { nombre = it },
-                    placeholder = "ej. Andrea Morales",
+                    label = "Nombres",
+                    valor = nombres,
+                    onValorChange = { nombres = it },
+                    placeholder = "Ej. Gerson Joel",
+                    icono = Icons.Outlined.Person
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Apellidos
+                CampoRegistro(
+                    label = "Apellidos",
+                    valor = apellidos,
+                    onValorChange = { apellidos = it },
+                    placeholder = "Ej. Silva Carrera",
                     icono = Icons.Outlined.Person
                 )
 
@@ -273,15 +286,9 @@ fun RegistroScreen(
                 // ---------- Botón Crear cuenta ----------
                 Button(
                     onClick = {
-                        // El backend espera nombres y apellidos separados.
-                        // Como aquí hay un solo campo, divido por el primer espacio.
-                        val partes = nombre.trim().split(" ", limit = 2)
-                        val nombres = partes.getOrNull(0) ?: ""
-                        val apellidos = partes.getOrNull(1) ?: ""
-
                         viewModel.registrar(
-                            nombres = nombres,
-                            apellidos = apellidos,
+                            nombres = nombres.trim(),
+                            apellidos = apellidos.trim(),
                             correo = correo.trim(),
                             password = contrasena
                         )
