@@ -73,6 +73,11 @@ dependencies {
     // ML Kit
     implementation(libs.play.services.mlkit.text.recognition)
 
+    // Cargar imágenes desde una URI en Jetpack Compose
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+
+
 
 
 

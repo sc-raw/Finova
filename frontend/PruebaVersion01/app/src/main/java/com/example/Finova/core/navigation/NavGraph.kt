@@ -25,6 +25,7 @@ import com.example.Finova.feature.movimientos.DetalleMovimientoScreen
 // Escaneo
 import com.example.Finova.feature.escaneo.EscanearScreen
 import com.example.Finova.feature.escaneo.ComprobanteRevisionScreen
+import com.example.Finova.feature.movimientos.NuevoMovimientoScreen
 
 // Estadísticas / Metas
 import com.example.Finova.feature.estadisticas.EstadisticasScreen
@@ -34,6 +35,8 @@ import com.example.Finova.feature.estadisticas.AnadirFondosScreen
 // Perfil
 import com.example.Finova.feature.perfil.PerfilScreen
 import com.example.Finova.feature.perfil.MisDatosScreen
+
+import android.net.Uri
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
@@ -70,7 +73,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onNavigate = goTo,
-                onScanClick = { goTo(Screen.Escanear.route) }
+                onScanClick = {
+                    goTo(Screen.Escanear.route)
+                },
+                onImagenSeleccionada = { uri ->
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+
+                    goTo(Screen.ComprobanteRevision.route)
+                }
             )
         }
         composable(Screen.MisCuentas.route) {
@@ -128,18 +140,54 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         composable(Screen.Escanear.route) {
             EscanearScreen(
                 onBack = { navController.popBackStack() },
-                onComprobanteCapturado = { goTo(Screen.ComprobanteRevision.route) }
+                onComprobanteCapturado = {
+                    goTo(Screen.ComprobanteRevision.route)
+                },
+                onImagenSeleccionada = { uri ->
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+
+                    goTo(Screen.ComprobanteRevision.route)
+                }
             )
         }
-        composable(Screen.ComprobanteRevision.route) {
+        composable(Screen.ComprobanteRevision.route) { backStackEntry ->
+
+            val imagenUri = navController.previousBackStackEntry
+                ?.savedStateHandle
+                ?.get<String>("imagen_comprobante_uri")
+                ?.let { Uri.parse(it) }
+
             ComprobanteRevisionScreen(
-                onBack = { navController.popBackStack() },
+                imagenUri = imagenUri,
+                onBack = {
+                    navController.popBackStack()
+                },
                 onConfirmar = {
                     navController.navigate(Screen.Dashboard.route) {
-                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                        popUpTo(Screen.Dashboard.route) {
+                            inclusive = true
+                        }
                     }
                 },
-                onDescartar = { navController.popBackStack() }
+                onDescartar = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.NuevoMovimiento.route) {
+            NuevoMovimientoScreen(
+                onBack = { navController.popBackStack() },
+                onGuardado = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 

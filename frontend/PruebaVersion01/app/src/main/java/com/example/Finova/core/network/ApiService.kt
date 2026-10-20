@@ -201,11 +201,15 @@ interface ApiService {
     @POST("api/movimientos/aportar-meta")
     suspend fun aportarMeta(@Body request: AportarMetaRequestDto)
 
+
+
     @GET("api/movimientos/usuario/{usuarioId}/tipo/{tipo}")
     suspend fun listarMovimientosPorTipoYUsuario(
         @Path("tipo") tipo: String,
         @Path("usuarioId") usuarioId: Long
     ): List<MovimientoDto>
+
+
 
     // ==========================================================
     // ==================== METAS ===============================
@@ -293,10 +297,11 @@ interface ApiService {
         @Body request: InterpretarComprobanteRequestDto
     ): InterpretarComprobanteResponseDto
 
-    @POST("api/comprobantes/confirmar")
+    @POST("api/movimientos/confirmar-comprobante")
     suspend fun confirmarComprobante(
         @Body request: ConfirmarComprobanteRequestDto
     ): MovimientoDto
+
 
     @Multipart
     @POST("api/comprobantes/analizar-imagen")

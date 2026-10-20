@@ -27,6 +27,11 @@ import com.example.Finova.core.network.dto.MovimientoDto
 import com.example.Finova.core.util.formatSoles
 import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
+
 // ============================================================
 // FINOVA — Dashboard (Inicio)
 // Vertical 2 · feature/inicio
@@ -47,6 +52,7 @@ private data class MovimientoVisual(
 fun DashboardScreen(
     onNavigate: (String) -> Unit,
     onScanClick: () -> Unit,
+    onImagenSeleccionada: (Uri) -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
     // --- Estado del bottom sheet ---
@@ -74,6 +80,15 @@ fun DashboardScreen(
     val presupuestoPct = 74
     val presupuestoRestante = 1420.00
     val presupuestoTotal = 5500.00
+
+    val selectorImagen = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onImagenSeleccionada(uri)
+        }
+    }
+
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -211,11 +226,11 @@ fun DashboardScreen(
             },
             onSubirImagen = {
                 mostrarSheet = false
-                onNavigate("escanear")
+                selectorImagen.launch("image/*")
             },
             onAgregarManual = {
                 mostrarSheet = false
-                onNavigate("detalle_movimiento")
+                onNavigate("nuevo_movimiento")
             },
             onTransferir = {
                 mostrarSheet = false

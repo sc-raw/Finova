@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 
 @Service
 public class OcrService {
@@ -33,11 +35,21 @@ public class OcrService {
                         "No se encontró la imagen: " + rutaImagen);
             }
 
-            return tesseract.doOCR(imagen);
+            BufferedImage imagenLeida = ImageIO.read(imagen);
+
+            if (imagenLeida == null) {
+                throw new IllegalArgumentException(
+                        "El archivo no es una imagen válida o su formato no es compatible.");
+            }
+
+            return tesseract.doOCR(imagenLeida);
 
         } catch (TesseractException e) {
             throw new RuntimeException(
                     "No se pudo extraer texto de la imagen", e);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(
+                    "No se pudo leer el archivo de imagen", e);
         }
     }
 }

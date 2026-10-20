@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.util.retry.Retry;
+import java.time.Duration;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -57,13 +59,22 @@ public class GeminiService {
         );
 
         try {
-            String response = webClient.post()
-                    .uri(apiUrl + (apiUrl.contains("?") ? "&" : "?")
-                            + "key=" + apiKey)
-                    .header("Content-Type", "application/json")
-                    .bodyValue(body)
-                    .retrieve()
-                    .bodyToMono(String.class)
+        	String response = webClient.post()
+        	        .uri(apiUrl + (apiUrl.contains("?") ? "&" : "?")
+        	                + "key=" + apiKey)
+        	        .header("Content-Type", "application/json")
+        	        .bodyValue(body)
+        	        .retrieve()
+        	        .bodyToMono(String.class)
+        	        .retryWhen(
+        	                Retry.backoff(2, Duration.ofSeconds(1))
+        	                        .maxBackoff(Duration.ofSeconds(3))
+        	                        .filter(error ->
+        	                                error instanceof WebClientResponseException ex
+        	                                        && (ex.getStatusCode().value() == 429
+        	                                        || ex.getStatusCode().is5xxServerError())
+        	                        )
+        	        )
                     .block();
 
             if (response == null || response.isBlank()) {
