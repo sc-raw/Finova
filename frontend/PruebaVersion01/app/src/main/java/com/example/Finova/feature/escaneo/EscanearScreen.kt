@@ -20,6 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.theme.*
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 // ============================================================
 // FINOVA — Escanear
 // Vertical 4 · feature/escaneo
@@ -29,11 +33,20 @@ import com.example.Finova.core.design.theme.*
 @Composable
 fun EscanearScreen(
     onBack: () -> Unit,
-    onComprobanteCapturado: () -> Unit
+    onComprobanteCapturado: () -> Unit,
+    onImagenSeleccionada: (Uri) -> Unit
 ) {
     var flashOn by remember { mutableStateOf(false) }
     var tabActiva by remember { mutableStateOf("boleta") }
     var mostrarTips by remember { mutableStateOf(false) }
+
+    val selectorImagen = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onImagenSeleccionada(uri)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -230,13 +243,13 @@ fun EscanearScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Galería
                 ControlInferior(
                     icono = Icons.Outlined.PhotoLibrary,
                     label = "Galería",
-                    onClick = onComprobanteCapturado
+                    onClick = {
+                        selectorImagen.launch("image/*")
+                    }
                 )
-
                 // Shutter (botón central grande)
                 Box(
                     modifier = Modifier

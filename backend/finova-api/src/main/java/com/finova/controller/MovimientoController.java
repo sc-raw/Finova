@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.finova.dto.ConfirmarComprobanteRequestDTO;
 
 import java.util.List;
 
@@ -150,4 +151,15 @@ public class MovimientoController {
                         .toList()
         );
     }
+    
+    @PostMapping("/confirmar-comprobante")
+    public ResponseEntity<MovimientoResponseDTO> confirmarComprobante(
+            @RequestBody ConfirmarComprobanteRequestDTO request) {
+
+        Movimiento guardado = movimientoService.confirmarComprobante(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(MovimientoResponseDTO.desdeEntidad(guardado));
+    }
+    
 }

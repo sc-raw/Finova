@@ -391,7 +391,10 @@ fun EstadisticasScreen(
             onDismiss = { mostrarSheet = false },
             onEscanear = { mostrarSheet = false; onNavigate("escanear") },
             onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
-            onAgregarManual = { mostrarSheet = false; onNavigate("detalle_movimiento") },
+            onAgregarManual = {
+                mostrarSheet = false
+                onNavigate("nuevo_movimiento")
+            },
             onTransferir = { mostrarSheet = false; onNavigate("transferir") }
         )
     }
