@@ -17,26 +17,52 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.theme.*
-
-// ============================================================
-// FINOVA — Mis Datos
-// Vertical 1 · feature/perfil
-// Basado en Image 4.html — SOLO VISTA
-// ============================================================
 
 @Composable
 fun MisDatosScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: PerfilViewModel = viewModel()
 ) {
-    var nombre by remember { mutableStateOf("Andrea Morales") }
-    var correo by remember { mutableStateOf("andrea.morales@correo.com") }
+    // 1. Observamos los estados del ViewModel
+    val usuario by viewModel.usuario.collectAsState()
+    val cargando by viewModel.cargando.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val exito by viewModel.exitoActualizacion.collectAsState()
+
+    // 2. Estados locales para los campos de texto
+    var nombre by remember { mutableStateOf("") }
+    var apellidos by remember { mutableStateOf("") }
+    var correo by remember { mutableStateOf("") }
+
+    // 3. Cuando el ViewModel carga el usuario, actualizamos los campos locales
+    LaunchedEffect(usuario) {
+        if (usuario != null) {
+            nombre = usuario?.nombres ?: ""
+            apellidos = usuario?.apellidos ?: ""
+            correo = usuario?.correo ?: ""
+        }
+    }
+
+    // 4. Si la actualización fue exitosa, volvemos atrás
+    LaunchedEffect(exito) {
+        if (exito) {
+            viewModel.resetearEstados()
+            onBack() // Regresa a PerfilScreen
+        }
+    }
+
+    // Cargar datos al entrar a la pantalla
+    LaunchedEffect(Unit) {
+        if (usuario == null) {
+            viewModel.cargarPerfil()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -112,116 +138,6 @@ fun MisDatosScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // ---------- Avatar + Cambiar foto ----------
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(modifier = Modifier.size(112.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(FinovaSurfaceContainerHighest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = FinovaOnSurfaceVariant,
-                            modifier = Modifier.size(56.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(FinovaPrimary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = null,
-                            tint = FinovaOnPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(FinovaSurfaceContainerHigh)
-                        .clickable { }
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = FinovaPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Cambiar foto",
-                        style = FinovaLabelMd,
-                        color = FinovaPrimary
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Formatos permitidos: JPG, PNG (Máx. 5 MB)",
-                    style = FinovaBodySm,
-                    color = FinovaOnSurfaceVariant
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // ---------- Banner de seguridad ----------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FinovaSecondaryContainer)
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(FinovaSurfaceContainerLowest),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = null,
-                        tint = FinovaSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Protección Biométrica y DNI",
-                        style = FinovaLabelMd,
-                        color = FinovaOnSecondaryContainer,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Tus datos fiscales y personales están cifrados de extremo a extremo.",
-                        style = FinovaBodySm,
-                        color = FinovaOnSecondaryContainer
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
             // ---------- Card: Información Personal ----------
             Column(
                 modifier = Modifier
@@ -248,7 +164,7 @@ fun MisDatosScreen(
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "Finova ID: #PE-8294",
+                            text = "ID: #${usuario?.id ?: "----"}",
                             style = FinovaLabelSm,
                             color = FinovaOnSurfaceVariant
                         )
@@ -259,7 +175,7 @@ fun MisDatosScreen(
 
                 // --- Nombre ---
                 CampoMisDatos(
-                    label = "Nombre completo",
+                    label = "Nombres",
                     valor = nombre,
                     onValorChange = { nombre = it },
                     icono = Icons.Outlined.Person,
@@ -270,6 +186,17 @@ fun MisDatosScreen(
                     text = "Tal como figura en tu Documento Nacional de Identidad (DNI).",
                     style = FinovaLabelSm,
                     color = FinovaOnSurfaceVariant
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // --- Apellidos ---
+                CampoMisDatos(
+                    label = "Apellidos",
+                    valor = apellidos,
+                    onValorChange = { apellidos = it },
+                    icono = Icons.Outlined.Person,
+                    trailingIcono = Icons.Outlined.Edit
                 )
 
                 Spacer(Modifier.height(14.dp))
@@ -290,156 +217,86 @@ fun MisDatosScreen(
                     color = FinovaOnSurfaceVariant
                 )
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(20.dp))
 
-                // --- Contraseña ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Contraseña",
-                        style = FinovaLabelSm,
-                        color = FinovaOnSurfaceVariant
-                    )
-                    Text(
-                        text = "Actualizada hace 2 meses",
-                        style = FinovaLabelSm,
-                        color = FinovaOnSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(FinovaSurfaceContainerLow)
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Lock,
-                        contentDescription = null,
-                        tint = FinovaPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        text = "••••••••••••",
-                        style = FinovaBodyMd,
-                        color = FinovaOnSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(FinovaSurfaceContainerHigh)
-                            .clickable { }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                // --- Mensaje de Error ---
+                error?.let {
+                    Surface(
+                        color = FinovaErrorContainer,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Cambiar",
-                            style = FinovaLabelMd,
-                            color = FinovaPrimary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                // --- DNI / RUC ---
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(FinovaSurfaceContainerLow)
-                        .clickable { }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(FinovaPrimaryContainer.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Badge,
-                            contentDescription = null,
-                            tint = FinovaPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "DNI / RUC Asociado",
-                            style = FinovaLabelMd,
-                            color = FinovaOnSurface,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "7482**** • Facturación SUNAT activa",
+                            text = it,
                             style = FinovaBodySm,
-                            color = FinovaOnSurfaceVariant
+                            color = FinovaError,
+                            modifier = Modifier.padding(10.dp)
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = FinovaOnSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // --- Botón Guardar ---
+                Button(
+                    onClick = {
+                        viewModel.guardarCambios(
+                            nombres = nombre,
+                            apellidos = apellidos,
+                            correo = correo
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = FinovaPrimaryContainer,
+                        contentColor = FinovaOnPrimary
+                    ),
+                    enabled = !cargando
+                ) {
+                    if (cargando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = FinovaOnPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Guardar datos",
+                            style = FinovaLabelLg,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // --- Botón Cancelar ---
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = FinovaSurfaceContainerHigh,
+                        contentColor = FinovaOnSurface
+                    ),
+                    enabled = !cargando
+                ) {
+                    Text(
+                        text = "Cancelar",
+                        style = FinovaLabelLg,
+                        fontWeight = FontWeight.Medium
                     )
                 }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // ---------- Botones ----------
-            Button(
-                onClick = { },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FinovaPrimaryContainer,
-                    contentColor = FinovaOnPrimary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Save,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Guardar datos",
-                    style = FinovaLabelLg,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onBack,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = FinovaSurfaceContainerHigh,
-                    contentColor = FinovaOnSurface
-                )
-            ) {
-                Text(
-                    text = "Cancelar",
-                    style = FinovaLabelLg,
-                    fontWeight = FontWeight.Medium
-                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -470,7 +327,7 @@ fun MisDatosScreen(
 }
 
 // ============================================================
-// Componentes internos
+// Componentes internos (¡ESTOS ERAN LOS QUE FALTABAN!)
 // ============================================================
 
 @Composable
