@@ -93,26 +93,28 @@ public class MovimientoController {
     @PostMapping("/gasto")
     public ResponseEntity<Void> registrarGasto(
             @RequestBody RegistrarGastoRequestDTO request) {
-        movimientoService.registrarGasto(
-                request.getCuentaId(),
-                request.getCategoriaId(),
-                request.getMetodoPagoId(),
-                request.getMonto(),
-                request.getDescripcion()
-        );
+    	movimientoService.registrarGasto(
+    	        request.getCuentaId(),
+    	        request.getCategoriaId(),
+    	        request.getMetodoPagoId(),
+    	        request.getMonto(),
+    	        request.getTitulo(),
+    	        request.getDescripcion()
+    	);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/ingreso")
     public ResponseEntity<Void> registrarIngreso(
             @RequestBody RegistrarIngresoRequestDTO request) {
-        movimientoService.registrarIngreso(
-                request.getCuentaId(),
-                request.getCategoriaId(),
-                request.getMetodoPagoId(),
-                request.getMonto(),
-                request.getDescripcion()
-        );
+    	movimientoService.registrarIngreso(
+    	        request.getCuentaId(),
+    	        request.getCategoriaId(),
+    	        request.getMetodoPagoId(),
+    	        request.getMonto(),
+    	        request.getTitulo(),
+    	        request.getDescripcion()
+    	);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

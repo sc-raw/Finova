@@ -19,11 +19,15 @@ public class Movimiento {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "movimiento_id")
     private Long id;
-
+    
+    @Column(length = 350)
+    private String titulo;
+    
+    
     @ManyToOne
     @JoinColumn(name = "cuenta_origen_id")
     private Cuenta cuentaOrigen;
-
+    
     @ManyToOne
     @JoinColumn(name = "cuenta_destino_id")
     private Cuenta cuentaDestino;

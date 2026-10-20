@@ -219,6 +219,7 @@ public class MovimientoServiceImp implements MovimientoService {
         revertirMovimiento(existente);
 
         existente.setDescripcion(movimiento.getDescripcion());
+        existente.setTitulo(movimiento.getTitulo());
         existente.setFechaMovimiento(
                 movimiento.getFechaMovimiento() != null
                         ? movimiento.getFechaMovimiento()
@@ -287,6 +288,7 @@ public class MovimientoServiceImp implements MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String titulo,
             String descripcion) {
 
         Cuenta cuenta = cuentaRepository.findById(cuentaId)
@@ -321,6 +323,7 @@ public class MovimientoServiceImp implements MovimientoService {
         movimiento.setCategoria(categoria);
         movimiento.setMetodoPago(metodoPago);
         movimiento.setMonto(monto);
+        movimiento.setTitulo(titulo);
         movimiento.setDescripcion(descripcion);
         movimiento.setTipoMovimiento(TipoMovimiento.GASTO);
         movimiento.setFechaMovimiento(LocalDateTime.now());
@@ -328,7 +331,6 @@ public class MovimientoServiceImp implements MovimientoService {
         cuentaRepository.save(cuenta);
         movimientoRepository.save(movimiento);
     }
-
 
     // =========================================================
     // REGISTRAR INGRESO
@@ -340,6 +342,7 @@ public class MovimientoServiceImp implements MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String titulo,
             String descripcion) {
 
         Cuenta cuenta = cuentaRepository.findById(cuentaId)
@@ -373,6 +376,7 @@ public class MovimientoServiceImp implements MovimientoService {
         movimiento.setCategoria(categoria);
         movimiento.setMetodoPago(metodoPago);
         movimiento.setMonto(monto);
+        movimiento.setTitulo(titulo);
         movimiento.setDescripcion(descripcion);
         movimiento.setTipoMovimiento(TipoMovimiento.INGRESO);
         movimiento.setFechaMovimiento(LocalDateTime.now());
@@ -382,109 +386,110 @@ public class MovimientoServiceImp implements MovimientoService {
     }
 
 
-    // =========================================================
-    // TRANSFERENCIA
-    // =========================================================
+	 // =========================================================
+	 // TRANSFERENCIA
+	 // =========================================================
+	
+	 @Override
+	 @Transactional
+	 public void transferir(
+	         Long cuentaOrigenId,
+	         Long cuentaDestinoId,
+	         BigDecimal monto,
+	         String descripcion) {
+	
+	     if (cuentaOrigenId == null || cuentaDestinoId == null) {
+	         throw new ReglaNegocioException(
+	                 "Las cuentas de origen y destino son obligatorias"
+	         );
+	     }
+	
+	     if (cuentaOrigenId.equals(cuentaDestinoId)) {
+	         throw new ReglaNegocioException(
+	                 "Las cuentas deben ser diferentes"
+	         );
+	     }
+	
+	     validarMonto(monto);
+	
+	     Cuenta origen = cuentaRepository.findById(cuentaOrigenId)
+	             .orElseThrow(() ->
+	                     new RecursoNoEncontradoException(
+	                             "Cuenta de origen no encontrada"
+	                     )
+	             );
+	
+	     Cuenta destino = cuentaRepository.findById(cuentaDestinoId)
+	             .orElseThrow(() ->
+	                     new RecursoNoEncontradoException(
+	                             "Cuenta de destino no encontrada"
+	                     )
+	             );
+	
+	     validarSaldo(origen, monto);
+	
+	     origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
+	     destino.setSaldoActual(destino.getSaldoActual().add(monto));
+	
+	     Movimiento movimiento = new Movimiento();
+	     movimiento.setCuentaOrigen(origen);
+	     movimiento.setCuentaDestino(destino);
+	     movimiento.setMonto(monto);
+	     movimiento.setTitulo("Transferencia entre cuentas");
+	     movimiento.setDescripcion(descripcion);
+	     movimiento.setTipoMovimiento(TipoMovimiento.TRANSFERENCIA);
+	     movimiento.setFechaMovimiento(LocalDateTime.now());
+	
+	     cuentaRepository.save(origen);
+	     cuentaRepository.save(destino);
+	     movimientoRepository.save(movimiento);
+	 }
 
-    @Override
-    @Transactional
-    public void transferir(
-            Long cuentaOrigenId,
-            Long cuentaDestinoId,
-            BigDecimal monto,
-            String descripcion) {
+	// =========================================================
+	// APORTE A META
+	// =========================================================
 
-        if (cuentaOrigenId == null || cuentaDestinoId == null) {
-            throw new ReglaNegocioException(
-                    "Las cuentas de origen y destino son obligatorias"
-            );
-        }
+	@Override
+	@Transactional
+	public void aportarMeta(
+	        Long cuentaId,
+	        Long metaId,
+	        BigDecimal monto,
+	        String descripcion) {
 
-        if (cuentaOrigenId.equals(cuentaDestinoId)) {
-            throw new ReglaNegocioException(
-                    "Las cuentas deben ser diferentes"
-            );
-        }
+	    if (cuentaId == null || metaId == null) {
+	        throw new ReglaNegocioException(
+	                "La cuenta y la meta son obligatorias"
+	        );
+	    }
 
-        validarMonto(monto);
+	    validarMonto(monto);
 
-        Cuenta origen = cuentaRepository.findById(cuentaOrigenId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "Cuenta de origen no encontrada"
-                        )
-                );
+	    Cuenta cuenta = cuentaRepository.findById(cuentaId)
+	            .orElseThrow(() ->
+	                    new RecursoNoEncontradoException(
+	                            "Cuenta no encontrada"
+	                    )
+	            );
 
-        Cuenta destino = cuentaRepository.findById(cuentaDestinoId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "Cuenta de destino no encontrada"
-                        )
-                );
+	    Meta meta = metaRepository.findById(metaId)
+	            .orElseThrow(() ->
+	                    new RecursoNoEncontradoException(
+	                            "Meta no encontrada"
+	                    )
+	            );
 
-        validarSaldo(origen, monto);
+	    Movimiento movimiento = new Movimiento();
+	    movimiento.setCuentaOrigen(cuenta);
+	    movimiento.setMeta(meta);
+	    movimiento.setMonto(monto);
+	    movimiento.setTitulo("Aporte a meta");
+	    movimiento.setDescripcion(descripcion);
+	    movimiento.setTipoMovimiento(TipoMovimiento.APORTE_META);
+	    movimiento.setFechaMovimiento(LocalDateTime.now());
 
-        origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
-        destino.setSaldoActual(destino.getSaldoActual().add(monto));
-
-        Movimiento movimiento = new Movimiento();
-        movimiento.setCuentaOrigen(origen);
-        movimiento.setCuentaDestino(destino);
-        movimiento.setMonto(monto);
-        movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(TipoMovimiento.TRANSFERENCIA);
-        movimiento.setFechaMovimiento(LocalDateTime.now());
-
-        cuentaRepository.save(origen);
-        cuentaRepository.save(destino);
-        movimientoRepository.save(movimiento);
-    }
-
-
-    // =========================================================
-    // APORTE A META
-    // =========================================================
-
-    @Override
-    @Transactional
-    public void aportarMeta(
-            Long cuentaId,
-            Long metaId,
-            BigDecimal monto,
-            String descripcion) {
-
-        if (cuentaId == null || metaId == null) {
-            throw new ReglaNegocioException(
-                    "La cuenta y la meta son obligatorias"
-            );
-        }
-
-        validarMonto(monto);
-
-        Cuenta cuenta = cuentaRepository.findById(cuentaId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "Cuenta no encontrada"
-                        )
-                );
-
-        Meta meta = metaRepository.findById(metaId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "Meta no encontrada"
-                        )
-                );
-
-        Movimiento movimiento = new Movimiento();
-        movimiento.setCuentaOrigen(cuenta);
-        movimiento.setMeta(meta);
-        movimiento.setMonto(monto);
-        movimiento.setDescripcion(descripcion);
-        movimiento.setTipoMovimiento(TipoMovimiento.APORTE_META);
-        movimiento.setFechaMovimiento(LocalDateTime.now());
-
-        guardar(movimiento);
-    }
+	    guardar(movimiento);
+	}
 
 
 
@@ -524,6 +529,7 @@ public class MovimientoServiceImp implements MovimientoService {
         movimiento.setTipoMovimiento(request.getTipoMovimiento());
         movimiento.setMonto(request.getMonto());
         movimiento.setFechaMovimiento(request.getFechaMovimiento());
+        movimiento.setTitulo(request.getNombreComercio());
         movimiento.setDescripcion(request.getDescripcion());
 
         if (request.getCuentaOrigenId() != null) {

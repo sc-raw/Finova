@@ -16,6 +16,7 @@ data class MovimientoDto(
     @SerializedName("metodoPagoId") val metodoPagoId: Long?,
     @SerializedName("metodoPagoNombre") val metodoPagoNombre: String?,
     @SerializedName("monto") val monto: Double?,
+    @SerializedName("titulo") val titulo: String?,
     @SerializedName("fechaMovimiento") val fechaMovimiento: String?,
     @SerializedName("descripcion") val descripcion: String?,
     @SerializedName("tipoMovimiento") val tipoMovimiento: String? // INGRESO, GASTO, TRANSFERENCIA, APORTE_META, RETIRO_META

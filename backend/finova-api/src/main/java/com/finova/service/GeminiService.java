@@ -1,3 +1,4 @@
+
 package com.finova.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,8 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.util.retry.Retry;
-import java.time.Duration;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -21,101 +20,101 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GeminiService {
 
-    @Value("${gemini.api.key}")
-    private String apiKey;
+    @Value("${ollama.api.url}")
+    private String ollamaApiUrl;
 
-    @Value("${gemini.api.url}")
-    private String apiUrl;
+    @Value("${ollama.api.model:qwen2.5:3b}")
+    private String ollamaModel;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WebClient webClient = WebClient.builder().build();
 
-    public InterpretarComprobanteResponseDTO interpretarComprobante(String ocrText) {
+    public InterpretarComprobanteResponseDTO interpretarComprobante(
+            String ocrText) {
+
         if (ocrText == null || ocrText.isBlank()) {
             throw new ReglaNegocioException(
                     "El texto OCR del comprobante es obligatorio"
             );
         }
 
-        if (apiKey == null || apiKey.isBlank()
-                || apiUrl == null || apiUrl.isBlank()) {
+        if (ollamaApiUrl == null || ollamaApiUrl.isBlank()) {
             throw new ReglaNegocioException(
-                    "La configuración de Gemini está incompleta"
+                    "La configuración de Ollama está incompleta"
             );
         }
 
         String prompt = construirPrompt(ocrText);
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("text", prompt)
-                        ))
-                ),
-                "generationConfig", Map.of(
-                        "temperature", 0.2,
-                        "responseMimeType", "application/json"
+                "model", ollamaModel,
+                "prompt", prompt,
+                "stream", false,
+                "format", "json",
+                "options", Map.of(
+                        "temperature", 0.2
                 )
         );
 
         try {
-        	String response = webClient.post()
-        	        .uri(apiUrl + (apiUrl.contains("?") ? "&" : "?")
-        	                + "key=" + apiKey)
-        	        .header("Content-Type", "application/json")
-        	        .bodyValue(body)
-        	        .retrieve()
-        	        .bodyToMono(String.class)
-        	        .retryWhen(
-        	                Retry.backoff(2, Duration.ofSeconds(1))
-        	                        .maxBackoff(Duration.ofSeconds(3))
-        	                        .filter(error ->
-        	                                error instanceof WebClientResponseException ex
-        	                                        && (ex.getStatusCode().value() == 429
-        	                                        || ex.getStatusCode().is5xxServerError())
-        	                        )
-        	        )
+            String response = webClient.post()
+                    .uri(ollamaApiUrl)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(String.class)
                     .block();
 
             if (response == null || response.isBlank()) {
                 throw new ReglaNegocioException(
-                        "Gemini devolvió una respuesta vacía"
+                        "Ollama devolvió una respuesta vacía"
                 );
             }
 
-            return parsearRespuesta(response);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode responseNode = root.path("response");
+
+            if (!responseNode.isTextual()
+                    || responseNode.asText().isBlank()) {
+                throw new ReglaNegocioException(
+                        "Ollama no devolvió texto válido"
+                );
+            }
+
+            return parsearRespuesta(responseNode.asText());
 
         } catch (WebClientResponseException e) {
             throw new ReglaNegocioException(
-                    "Error de Gemini: HTTP " + e.getStatusCode().value()
+                    "Error de Ollama: HTTP "
+                            + e.getStatusCode().value()
             );
         } catch (ReglaNegocioException e) {
             throw e;
         } catch (Exception e) {
             throw new ReglaNegocioException(
-                    "No se pudo interpretar el comprobante"
+                    "No se pudo interpretar el comprobante con Ollama"
             );
         }
     }
 
     private String construirPrompt(String ocrText) {
         return """
-                Eres un asistente financiero. Analiza el texto OCR de un
-                comprobante peruano y devuelve exclusivamente un JSON válido
-                con esta estructura:
+                Eres un asistente financiero que analiza comprobantes peruanos.
+
+                Devuelve exclusivamente un JSON válido con esta estructura:
 
                 {
                   "razonamiento": "explicación breve",
                   "tipoDocumento": "boleta|factura|recibo|voucher|otro",
                   "comercio": "nombre del comercio",
-                  "ruc": "RUC o null",
-                  "fecha": "fecha ISO 8601 o null",
-                  "moneda": "PEN|USD",
-                  "subtotal": 0.0,
-                  "igv": 0.0,
-                  "total": 0.0,
+                  "ruc": null,
+                  "fecha": null,
+                  "moneda": "PEN",
+                  "subtotal": null,
+                  "igv": null,
+                  "total": null,
                   "categoriaSugerida": "Alimentación|Servicios|Transporte|Salud|Ocio|Otros",
-                  "confianza": 0.95,
+                  "confianza": 0.0,
                   "items": [
                     {
                       "nombre": "producto",
@@ -127,39 +126,21 @@ public class GeminiService {
 
                 Reglas:
                 - No inventes información que no aparezca en el comprobante.
-                - Si un dato no está disponible, utiliza null cuando corresponda.
+                - Si un dato no está disponible, utiliza null.
                 - Los importes deben ser números, no cadenas de texto.
                 - La confianza debe ser un número entre 0 y 1.
-                - Responde únicamente con el JSON, sin bloques Markdown.
+                - La fecha debe estar en formato ISO 8601 (AAAA-MM-DD) o ser null.
+                - Usa PEN para soles peruanos y USD para dólares.
+                - Si no hay productos identificables, devuelve items como [].
+                - Devuelve únicamente el JSON, sin bloques Markdown.
 
-                Texto OCR:
+                Texto OCR del comprobante:
                 """ + ocrText;
     }
 
     private InterpretarComprobanteResponseDTO parsearRespuesta(
-            String response) throws Exception {
+            String textoJson) throws Exception {
 
-        JsonNode root = objectMapper.readTree(response);
-        JsonNode candidates = root.path("candidates");
-
-        if (!candidates.isArray() || candidates.isEmpty()) {
-            throw new ReglaNegocioException(
-                    "Gemini no devolvió resultados para el comprobante"
-            );
-        }
-
-        JsonNode parts = candidates.get(0)
-                .path("content")
-                .path("parts");
-
-        if (!parts.isArray() || parts.isEmpty()
-                || !parts.get(0).hasNonNull("text")) {
-            throw new ReglaNegocioException(
-                    "La respuesta de Gemini no contiene texto válido"
-            );
-        }
-
-        String textoJson = parts.get(0).get("text").asText();
         JsonNode data = objectMapper.readTree(textoJson);
 
         InterpretarComprobanteResponseDTO dto =
@@ -203,7 +184,8 @@ public class GeminiService {
     private String textoOpcional(JsonNode data, String campo) {
         JsonNode valor = data.get(campo);
 
-        if (valor == null || valor.isNull() || valor.asText().isBlank()) {
+        if (valor == null || valor.isNull()
+                || valor.asText().isBlank()) {
             return null;
         }
 
@@ -215,7 +197,7 @@ public class GeminiService {
 
         if (valor == null || valor.isNull()
                 || valor.asText().isBlank()
-                || !valor.isNumber() && !valor.isTextual()) {
+                || (!valor.isNumber() && !valor.isTextual())) {
             return null;
         }
 

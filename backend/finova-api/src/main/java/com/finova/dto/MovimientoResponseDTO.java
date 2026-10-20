@@ -1,3 +1,4 @@
+
 package com.finova.dto;
 
 import com.finova.entity.Movimiento;
@@ -34,6 +35,7 @@ public class MovimientoResponseDTO {
     private String metodoPagoNombre;
 
     private BigDecimal monto;
+    private String titulo;
     private LocalDateTime fechaMovimiento;
     private String descripcion;
     private String tipoMovimiento;
@@ -88,6 +90,7 @@ public class MovimientoResponseDTO {
                         : null,
 
                 movimiento.getMonto(),
+                movimiento.getTitulo(),
                 movimiento.getFechaMovimiento(),
                 movimiento.getDescripcion(),
 

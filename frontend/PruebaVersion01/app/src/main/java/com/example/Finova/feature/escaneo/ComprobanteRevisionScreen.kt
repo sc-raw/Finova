@@ -106,13 +106,18 @@ fun ComprobanteRevisionScreen(
     }
 
 // Cargar categorías de gasto
-    LaunchedEffect(Unit) {
+    LaunchedEffect(tipoMovimiento) {
         try {
             categorias = ApiClient.apiService
-                .listarCategoriasPorTipo("GASTO")
+                .listarCategoriasPorTipo(tipoMovimiento)
+
+            categoriaSeleccionada = null
             errorCategorias = false
         } catch (e: Exception) {
+            categorias = emptyList()
+            categoriaSeleccionada = null
             errorCategorias = true
+
             android.util.Log.e(
                 "FinovaCategorias",
                 "Error al cargar categorías",
@@ -222,6 +227,7 @@ fun ComprobanteRevisionScreen(
 
                         else -> {
                             scope.launch {
+
                                 guardando = true
                                 mensajeError = null
 
