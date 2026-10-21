@@ -3,6 +3,7 @@ package com.example.Finova.core.network
 import com.example.Finova.core.network.dto.*
 import okhttp3.MultipartBody
 import retrofit2.http.*
+import retrofit2.http.PATCH
 
 interface ApiService {
 
@@ -301,6 +302,12 @@ interface ApiService {
     suspend fun confirmarComprobante(
         @Body request: ConfirmarComprobanteRequestDto
     ): MovimientoDto
+
+    @PATCH("api/movimientos/{id}/editar")
+    suspend fun editarMovimiento(
+        @Path("id") id: Long,
+        @Body request: EditarMovimientoRequest
+    )
 
 
     @Multipart

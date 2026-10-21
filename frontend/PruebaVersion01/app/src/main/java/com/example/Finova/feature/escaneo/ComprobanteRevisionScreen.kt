@@ -43,7 +43,13 @@ import com.example.Finova.core.util.SessionManager
 
 import com.example.Finova.core.network.dto.ConfirmarComprobanteRequestDto
 import com.example.Finova.core.network.dto.CuentaDto
+import com.example.Finova.core.network.dto.MetodoPagoDto
 import kotlinx.coroutines.launch
+
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
 
 
 // ============================================================
@@ -73,14 +79,29 @@ fun ComprobanteRevisionScreen(
 
     var cuentas by remember { mutableStateOf<List<CuentaDto>>(emptyList()) }
     var cuentaSeleccionada by remember { mutableStateOf<CuentaDto?>(null) }
+    var metodosPago by remember { mutableStateOf<List<MetodoPagoDto>>(emptyList()) }
+    var metodoPagoSeleccionado by remember { mutableStateOf<MetodoPagoDto?>(null) }
+    var menuMetodosPagoAbierto by remember { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
     var mensajeError by remember { mutableStateOf<String?>(null) }
+    var errorMonto by remember { mutableStateOf<String?>(null) }
+    var errorComercio by remember { mutableStateOf<String?>(null) }
+    var errorCuenta by remember { mutableStateOf<String?>(null) }
+    var errorMetodoPago by remember { mutableStateOf<String?>(null) }
+    var errorCategoria by remember { mutableStateOf<String?>(null) }
     var tipoMovimiento by remember { mutableStateOf("GASTO") }
 
     var categorias by remember { mutableStateOf<List<CategoriaDto>>(emptyList()) }
     var categoriaSeleccionada by remember { mutableStateOf<CategoriaDto?>(null) }
     var menuCategoriasAbierto by remember { mutableStateOf(false) }
     var errorCategorias by remember { mutableStateOf(false) }
+
+    val fechaHoraActual = remember {
+        java.text.SimpleDateFormat(
+            "'Hoy, 'dd MMM yyyy '·' HH:mm",
+            java.util.Locale("es", "PE")
+        ).format(java.util.Date())
+    }
 
     // Cargar cuentas del usuario
     LaunchedEffect(Unit) {
@@ -91,10 +112,12 @@ fun ComprobanteRevisionScreen(
             if (usuarioId != -1L) {
                 cuentas = ApiClient.apiService
                     .listarCuentasPorUsuario(usuarioId)
+                metodosPago = ApiClient.apiService.listarMetodosPagoActivos()
 
                 if (cuentas.isNotEmpty()) {
                     cuentaSeleccionada = cuentas.first()
                 }
+                metodoPagoSeleccionado = metodosPago.firstOrNull()
             }
         } catch (e: Exception) {
             android.util.Log.e(
@@ -212,60 +235,51 @@ fun ComprobanteRevisionScreen(
 
                     val montoNumerico = monto.toDoubleOrNull()
 
-                    when {
-                        montoNumerico == null || montoNumerico <= 0 -> {
-                            mensajeError = "Ingresa un monto válido."
-                        }
+                    errorMonto = if (montoNumerico == null || montoNumerico <= 0) "Ingresa un monto válido." else null
+                    errorComercio = if (comercio.isBlank()) "Completa el nombre del comercio o proveedor." else null
+                    errorCuenta = if (cuentaSeleccionada == null) "Selecciona una cuenta." else null
+                    errorCategoria = if (categoriaSeleccionada == null) "Selecciona una categoría." else null
+                    errorMetodoPago = if (metodoPagoSeleccionado == null) "Selecciona un método de pago." else null
 
-                        cuentaSeleccionada == null -> {
-                            mensajeError = "Selecciona una cuenta."
-                        }
+                    if (errorMonto == null && errorComercio == null && errorCuenta == null && errorCategoria == null && errorMetodoPago == null) {
+                        scope.launch {
+                            guardando = true
+                            mensajeError = null
 
-                        categoriaSeleccionada == null -> {
-                            mensajeError = "Selecciona una categoría."
-                        }
+                            try {
+                                val request = ConfirmarComprobanteRequestDto(
+                                    tipoMovimiento = tipoMovimiento,
+                                    cuentaOrigenId = if (tipoMovimiento == "GASTO") cuentaSeleccionada!!.id else null,
+                                    cuentaDestinoId = if (tipoMovimiento == "INGRESO") cuentaSeleccionada!!.id else null,
+                                    categoriaId = categoriaSeleccionada!!.id,
+                                    metodoPagoId = metodoPagoSeleccionado!!.id,
+                                    monto = montoNumerico!!,
+                                    fechaMovimiento = java.text.SimpleDateFormat(
+                                        "yyyy-MM-dd'T'HH:mm:ss",
+                                        java.util.Locale.getDefault()
+                                    ).format(java.util.Date()),
+                                    descripcion =  null,
+                                    nombreComercio = comercio.ifBlank { null },
+                                    ruc = null,
+                                    codigoOperacion = null,
+                                    rutaComprobante = imagenUri?.toString()
+                                )
 
-                        else -> {
-                            scope.launch {
-
-                                guardando = true
-                                mensajeError = null
-
-                                try {
-                                    val request = ConfirmarComprobanteRequestDto(
-                                        tipoMovimiento = tipoMovimiento,
-                                        cuentaOrigenId = if (tipoMovimiento == "GASTO") cuentaSeleccionada!!.id else null,
-                                        cuentaDestinoId = if (tipoMovimiento == "INGRESO") cuentaSeleccionada!!.id else null,
-                                        categoriaId = categoriaSeleccionada!!.id,
-                                        metodoPagoId = null,
-                                        monto = montoNumerico,
-                                        fechaMovimiento = java.text.SimpleDateFormat(
-                                            "yyyy-MM-dd'T'HH:mm:ss",
-                                            java.util.Locale.getDefault()
-                                        ).format(java.util.Date()),
-                                        descripcion =  null,
-                                        nombreComercio = comercio.ifBlank { null },
-                                        ruc = null,
-                                        codigoOperacion = null,
-                                        rutaComprobante = imagenUri?.toString()
-                                    )
-
-                                    withContext(Dispatchers.IO) {
-                                        ApiClient.apiService.confirmarComprobante(request)
-                                    }
-
-                                    onConfirmar()
-                                } catch (e: Exception) {
-                                    mensajeError =
-                                        "No se pudo guardar el comprobante: ${e.message ?: "Error desconocido"}"
-                                    android.util.Log.e(
-                                        "FinovaGuardar",
-                                        "Error al guardar comprobante",
-                                        e
-                                    )
-                                } finally {
-                                    guardando = false
+                                withContext(Dispatchers.IO) {
+                                    ApiClient.apiService.confirmarComprobante(request)
                                 }
+
+                                onConfirmar()
+                            } catch (e: Exception) {
+                                mensajeError =
+                                    "No se pudo guardar el comprobante: ${e.message ?: "Error desconocido"}"
+                                android.util.Log.e(
+                                    "FinovaGuardar",
+                                    "Error al guardar comprobante",
+                                    e
+                                )
+                            } finally {
+                                guardando = false
                             }
                         }
                     }
@@ -474,7 +488,10 @@ fun ComprobanteRevisionScreen(
                         Spacer(Modifier.width(4.dp))
                         BasicTextField(
                             value = monto,
-                            onValueChange = { monto = it },
+                            onValueChange = {
+                                monto = it
+                                if (it.toDoubleOrNull()?.let { valor -> valor > 0 } == true) errorMonto = null
+                            },
                             modifier = Modifier.weight(1f),
                             textStyle = FinovaDisplayLgMobile.copy(
                                 color = FinovaOnSurface,
@@ -503,6 +520,14 @@ fun ComprobanteRevisionScreen(
                         )
                     }
                 }
+                if (errorMonto != null) {
+                    Text(
+                        text = errorMonto!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = FinovaBodySm,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -516,8 +541,12 @@ fun ComprobanteRevisionScreen(
                 iconBg = FinovaSecondaryContainer,
                 iconTint = FinovaOnSecondaryContainer,
                 valor = comercio,
-                onValorChange = { comercio = it },
-                trailingIcono = Icons.Default.Edit
+                onValorChange = {
+                    comercio = it
+                    if (it.isNotBlank()) errorComercio = null
+                },
+                trailingIcono = null,
+                error = errorComercio
             )
 
             Spacer(Modifier.height(12.dp))
@@ -530,7 +559,7 @@ fun ComprobanteRevisionScreen(
                 iconoCampo = Icons.Outlined.CalendarToday,
                 iconBg = FinovaSurfaceContainerHigh,
                 iconTint = FinovaOnSurfaceVariant,
-                valor = "Hoy, 28 Oct 2023 · 14:32",
+                valor = fechaHoraActual,
                 onValorChange = { },
                 trailingIcono = Icons.Default.EditCalendar
             )
@@ -614,6 +643,7 @@ fun ComprobanteRevisionScreen(
                                 text = { Text(categoria.nombre ?: "Sin nombre") },
                                 onClick = {
                                     categoriaSeleccionada = categoria
+                                    errorCategoria = null
                                     menuCategoriasAbierto = false
                                 }
                             )
@@ -621,7 +651,94 @@ fun ComprobanteRevisionScreen(
                     }
                 }
             }
+            if (errorCategoria != null) {
+                Text(
+                    text = errorCategoria!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = FinovaBodySm,
+                    modifier = Modifier.padding(start = 14.dp, top = 4.dp)
+                )
+            }
 
+            // ---------- Método de pago ----------
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(FinovaSurfaceContainerLowest)
+                        .clickable { menuMetodosPagoAbierto = true }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(FinovaSurfaceContainerHigh),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Payments,
+                            contentDescription = null,
+                            tint = FinovaPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = metodoPagoSeleccionado?.nombre ?: "Selecciona un método de pago",
+                            style = FinovaTitleMd,
+                            color = FinovaOnSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Método utilizado para esta operación",
+                            style = FinovaBodySm,
+                            color = FinovaOnSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Seleccionar método de pago",
+                        tint = FinovaOnSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuMetodosPagoAbierto,
+                    onDismissRequest = { menuMetodosPagoAbierto = false }
+                ) {
+                    if (metodosPago.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("No hay métodos de pago disponibles") },
+                            onClick = { menuMetodosPagoAbierto = false }
+                        )
+                    } else {
+                        metodosPago.forEach { metodo ->
+                            DropdownMenuItem(
+                                text = { Text(metodo.nombre ?: "Método de pago ${metodo.id}") },
+                                onClick = {
+                                    metodoPagoSeleccionado = metodo
+                                    errorMetodoPago = null
+                                    menuMetodosPagoAbierto = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            if (errorMetodoPago != null) {
+                Text(
+                    text = errorMetodoPago!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = FinovaBodySm,
+                    modifier = Modifier.padding(start = 14.dp, top = 4.dp)
+                )
+            }
+            Spacer(Modifier.height(12.dp))
 
             // ---------- Cuenta de pago ----------
             Box {
@@ -698,6 +815,7 @@ fun ComprobanteRevisionScreen(
                             },
                             onClick = {
                                 cuentaSeleccionada = cuenta
+                                errorCuenta = null
                                 menuCuentasAbierto = false
                             }
                         )
@@ -710,6 +828,14 @@ fun ComprobanteRevisionScreen(
                         )
                     }
                 }
+            }
+            if (errorCuenta != null) {
+                Text(
+                    text = errorCuenta!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = FinovaBodySm,
+                    modifier = Modifier.padding(start = 14.dp, top = 4.dp)
+                )
             }
 
             // ---------- Productos detectados por OCR ----------
@@ -899,7 +1025,8 @@ private fun CampoRevision(
     iconTint: Color,
     valor: String,
     onValorChange: (String) -> Unit,
-    trailingIcono: androidx.compose.ui.graphics.vector.ImageVector
+    trailingIcono: androidx.compose.ui.graphics.vector.ImageVector?,
+    error: String? = null
 ) {
     Column(
         modifier = Modifier
@@ -960,11 +1087,21 @@ private fun CampoRevision(
                 singleLine = true,
                 cursorBrush = SolidColor(FinovaPrimary)
             )
-            Icon(
-                imageVector = trailingIcono,
-                contentDescription = null,
-                tint = FinovaOnSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+            if (trailingIcono != null) {
+                Icon(
+                    imageVector = trailingIcono,
+                    contentDescription = null,
+                    tint = FinovaOnSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        if (error != null) {
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                style = FinovaBodySm,
+                modifier = Modifier.padding(start = 52.dp, top = 6.dp)
             )
         }
     }

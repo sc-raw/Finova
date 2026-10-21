@@ -25,12 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.theme.*
 
-// ============================================================
-// FINOVA — Bottom Sheet: ¿Qué quieres registrar?
-// Vertical 3 · feature/movimientos
-// Basado en Image 2.html — SOLO VISTA
-// ============================================================
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NuevaTransaccionSheet(
@@ -38,7 +32,6 @@ fun NuevaTransaccionSheet(
     onEscanear: () -> Unit,
     onSubirImagen: () -> Unit,
     onAgregarManual: () -> Unit,
-    onTransferir: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -132,17 +125,7 @@ fun NuevaTransaccionSheet(
 
             Spacer(Modifier.height(10.dp))
 
-            // ---------- Opción 4: Transferir ----------
-            OpcionSimple(
-                icono = Icons.Outlined.SyncAlt,
-                iconBg = FinovaTertiaryFixed,
-                iconTint = FinovaOnTertiaryFixedVariant,
-                titulo = "Transferir entre cuentas",
-                subtitulo = "Mueve dinero entre tus cuentas",
-                onClick = onTransferir
-            )
 
-            Spacer(Modifier.height(20.dp))
 
             // ---------- Nota de privacidad ----------
             Row(

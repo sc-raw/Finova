@@ -1,6 +1,10 @@
 package com.example.Finova.core.navigation
 
+import android.net.Uri
+
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,11 +25,13 @@ import com.example.Finova.feature.cuentas.TransferirScreen
 // Movimientos
 import com.example.Finova.feature.movimientos.HistorialScreen
 import com.example.Finova.feature.movimientos.DetalleMovimientoScreen
+import com.example.Finova.feature.movimientos.EditarMovimientoScreen
+import com.example.Finova.feature.movimientos.MovimientosViewModel
+import com.example.Finova.feature.movimientos.NuevoMovimientoScreen
 
 // Escaneo
 import com.example.Finova.feature.escaneo.EscanearScreen
 import com.example.Finova.feature.escaneo.ComprobanteRevisionScreen
-import com.example.Finova.feature.movimientos.NuevoMovimientoScreen
 
 // Estadísticas / Metas
 import com.example.Finova.feature.estadisticas.EstadisticasScreen
@@ -36,10 +42,10 @@ import com.example.Finova.feature.estadisticas.AnadirFondosScreen
 import com.example.Finova.feature.perfil.PerfilScreen
 import com.example.Finova.feature.perfil.MisDatosScreen
 
-import android.net.Uri
-
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
+
+    val historialViewModel: MovimientosViewModel = viewModel()
 
     // Helper: navega evitando duplicados en el back stack
     val goTo: (String) -> Unit = { route ->
@@ -56,20 +62,26 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         // ---------- AUTH ----------
         composable(Screen.Splash.route) {
-            SplashScreen(onTimeout = {
-                navController.navigate(Screen.Login.route) {
-                    popUpTo(Screen.Splash.route) { inclusive = true }
+            SplashScreen(
+                onTimeout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Splash.route) {
+                            inclusive = true
+                        }
+                    }
                 }
-            })
+            )
         }
+
         composable(Screen.Login.route) {
             LoginScreen(onNavigate = goTo)
         }
+
         composable(Screen.Registro.route) {
             RegistroScreen(onNavigate = goTo)
         }
 
-        // ---------- VERTICAL 2: INICIO Y CUENTAS ----------
+        // ---------- INICIO Y CUENTAS ----------
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onNavigate = goTo,
@@ -85,61 +97,120 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 }
             )
         }
+
         composable(Screen.MisCuentas.route) {
             MisCuentasScreen(
                 onNavigate = goTo,
-                onTransferClick = { goTo(Screen.Transferir.route) }
+                onTransferClick = {
+                    goTo(Screen.Transferir.route)
+                }
             )
         }
+
         composable(Screen.Transferir.route) {
             TransferirScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.popBackStack()
+                },
                 onTransferenciaExitosa = {
                     navController.navigate(Screen.MisCuentas.route) {
-                        popUpTo(Screen.MisCuentas.route) { inclusive = true }
+                        popUpTo(Screen.MisCuentas.route) {
+                            inclusive = true
+                        }
                     }
                 }
             )
         }
 
-        // ---------- VERTICAL 3: MOVIMIENTOS ----------
+        // ---------- MOVIMIENTOS ----------
         composable(Screen.Historial.route) {
+            LaunchedEffect(Unit) {
+                historialViewModel.cargarMovimientos()
+            }
+
             HistorialScreen(
                 onNavigate = goTo,
                 onMovimientoClick = { movimientoId ->
                     navController.navigate(
                         Screen.DetalleMovimiento.createRoute(movimientoId)
                     )
+                },
+                viewModel = historialViewModel
+            )
+        }
+
+        composable(
+            route = "detalle_movimiento/{movimientoId}",
+            arguments = listOf(
+                navArgument("movimientoId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+
+            val movimientoId =
+                backStackEntry.arguments?.getLong("movimientoId") ?: 0L
+
+            DetalleMovimientoScreen(
+                movimientoId = movimientoId,
+                onBack = {
+                    navController.popBackStack()
+                },
+                onEdit = { id ->
+                    goTo("editar_movimiento/$id")
                 }
             )
         }
 
-        // ✅ Detalle con argumento movimientoId
         composable(
-            route = "detalle_movimiento/{movimientoId}",
+            route = "editar_movimiento/{movimientoId}",
             arguments = listOf(
-                navArgument("movimientoId") { type = NavType.LongType }
+                navArgument("movimientoId") {
+                    type = NavType.LongType
+                }
             )
         ) { backStackEntry ->
-            val movimientoId = backStackEntry.arguments?.getLong("movimientoId") ?: 0L
-            DetalleMovimientoScreen(
+
+            val movimientoId =
+                backStackEntry.arguments?.getLong("movimientoId") ?: 0L
+
+            EditarMovimientoScreen(
                 movimientoId = movimientoId,
-                onBack = { navController.popBackStack() }
+                onBack = {
+                    navController.popBackStack()
+                },
+                onGuardado = {
+                    navController.navigate(
+                        Screen.DetalleMovimiento.createRoute(movimientoId)
+                    ) {
+                        popUpTo("detalle_movimiento/$movimientoId") {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
-        // ---------- VERTICAL 1: PERFIL ----------
+        // ---------- PERFIL ----------
         composable(Screen.Perfil.route) {
             PerfilScreen(onNavigate = goTo)
         }
+
         composable(Screen.MisDatos.route) {
-            MisDatosScreen(onBack = { navController.popBackStack() })
+            MisDatosScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
         }
 
-        // ---------- VERTICAL 4: ESCANEO ----------
+        // ---------- ESCANEO ----------
         composable(Screen.Escanear.route) {
             EscanearScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.popBackStack()
+                },
                 onComprobanteCapturado = {
                     goTo(Screen.ComprobanteRevision.route)
                 },
@@ -152,8 +223,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 }
             )
         }
-        composable(Screen.ComprobanteRevision.route) { backStackEntry ->
 
+        composable(Screen.ComprobanteRevision.route) {
             val imagenUri = navController.previousBackStackEntry
                 ?.savedStateHandle
                 ?.get<String>("imagen_comprobante_uri")
@@ -179,7 +250,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Screen.NuevoMovimiento.route) {
             NuevoMovimientoScreen(
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.popBackStack()
+                },
                 onGuardado = {
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Dashboard.route) {
@@ -191,24 +264,36 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // ---------- VERTICAL 5: ESTADÍSTICAS Y METAS ----------
+        // ---------- ESTADÍSTICAS Y METAS ----------
         composable(Screen.Estadisticas.route) {
             EstadisticasScreen(
                 onNavigate = goTo,
-                onBack = { navController.popBackStack() }
+                onBack = {
+                    navController.popBackStack()
+                }
             )
         }
+
         composable(Screen.Metas.route) {
             MetasScreen(
                 onNavigate = goTo,
-                onAnadirFondos = { goTo(Screen.AnadirFondos.route) },
-                onBack = { navController.popBackStack() }
+                onAnadirFondos = {
+                    goTo(Screen.AnadirFondos.route)
+                },
+                onBack = {
+                    navController.popBackStack()
+                }
             )
         }
+
         composable(Screen.AnadirFondos.route) {
             AnadirFondosScreen(
-                onBack = { navController.popBackStack() },
-                onConfirmar = { goTo(Screen.Metas.route) }
+                onBack = {
+                    navController.popBackStack()
+                },
+                onConfirmar = {
+                    goTo(Screen.Metas.route)
+                }
             )
         }
     }

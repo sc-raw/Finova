@@ -221,8 +221,7 @@ fun MisCuentasScreen(
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
-            },
-            onTransferir = { mostrarSheet = false; onNavigate("transferir") }
+            }
         )
     }
 }

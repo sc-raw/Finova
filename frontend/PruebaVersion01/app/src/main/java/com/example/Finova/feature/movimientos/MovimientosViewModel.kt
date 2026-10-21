@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 enum class FiltroMovimiento {
-    TODOS, INGRESOS, GASTOS
+    TODOS,
+    INGRESOS,
+    GASTOS,
+    TRANSFERENCIAS,
+    METAS
 }
 
 class MovimientosViewModel(application: Application) : AndroidViewModel(application) {
@@ -105,28 +109,46 @@ class MovimientosViewModel(application: Application) : AndroidViewModel(applicat
     private fun aplicarFiltro(filtro: FiltroMovimiento, busqueda: String) {
         var lista = _movimientos.value
 
-        // Filtro por tipo
+        // Filtro por tipo de movimiento.
         lista = when (filtro) {
             FiltroMovimiento.TODOS -> lista
-            FiltroMovimiento.INGRESOS -> lista.filter { it.tipoMovimiento == "INGRESO" }
-            FiltroMovimiento.GASTOS -> lista.filter { it.tipoMovimiento == "GASTO" }
+            FiltroMovimiento.INGRESOS ->
+                lista.filter { it.tipoMovimiento == "INGRESO" }
+
+            FiltroMovimiento.GASTOS ->
+                lista.filter { it.tipoMovimiento == "GASTO" }
+
+            FiltroMovimiento.TRANSFERENCIAS ->
+                lista.filter { it.tipoMovimiento == "TRANSFERENCIA" }
+
+            FiltroMovimiento.METAS ->
+                lista.filter {
+                    it.tipoMovimiento == "APORTE_META" ||
+                            it.tipoMovimiento == "RETIRO_META"
+                }
         }
 
-        // Filtro por búsqueda
+        // Búsqueda por descripción, título, categoría o cuenta.
         if (busqueda.isNotBlank()) {
-            lista = lista.filter {
-                (it.descripcion ?: "").contains(busqueda, ignoreCase = true) ||
-                        (it.categoriaNombre ?: "").contains(busqueda, ignoreCase = true)
+            lista = lista.filter { movimiento ->
+                (movimiento.descripcion ?: "").contains(busqueda, ignoreCase = true) ||
+                        (movimiento.titulo ?: "").contains(busqueda, ignoreCase = true) ||
+                        (movimiento.categoriaNombre ?: "").contains(busqueda, ignoreCase = true) ||
+                        (movimiento.cuentaOrigenNombre ?: "").contains(busqueda, ignoreCase = true) ||
+                        (movimiento.cuentaDestinoNombre ?: "").contains(busqueda, ignoreCase = true)
             }
         }
 
-        _movimientosFiltrados.value = lista
+        _movimientosFiltrados.value = lista.sortedByDescending {
+            it.fechaMovimiento ?: ""
+        }
     }
 
     // ============ ELIMINAR ============
     fun eliminarMovimiento(id: Long) {
         viewModelScope.launch {
             _eliminando.value = true
+            _error.value = null
             try {
                 repository.eliminarMovimiento(id)
                 _eliminadoExitoso.value = true
@@ -154,13 +176,29 @@ class MovimientosViewModel(application: Application) : AndroidViewModel(applicat
             .filter { it.tipoMovimiento == "GASTO" }
             .sumOf { it.monto ?: 0.0 }
 
+    fun totalTransferencias(): Double =
+        _movimientosFiltrados.value
+            .filter { it.tipoMovimiento == "TRANSFERENCIA" }
+            .sumOf { it.monto ?: 0.0 }
+
+    fun totalMovimientosMeta(): Double =
+        _movimientosFiltrados.value
+            .filter {
+                it.tipoMovimiento == "APORTE_META" ||
+                        it.tipoMovimiento == "RETIRO_META"
+            }
+            .sumOf { it.monto ?: 0.0 }
+
     // ============ UTIL ============
     private fun traducirError(mensaje: String?): String {
         return when {
             mensaje == null -> "Error desconocido"
-            mensaje.contains("Connection refused") -> "No se pudo conectar al servidor"
-            mensaje.contains("Unable to resolve host") -> "Sin conexión a Internet"
-            mensaje.contains("401") -> "Sesión expirada"
+            mensaje.contains("Connection refused", ignoreCase = true) ->
+                "No se pudo conectar al servidor"
+            mensaje.contains("Unable to resolve host", ignoreCase = true) ->
+                "Sin conexión a Internet"
+            mensaje.contains("401") ->
+                "Sesión expirada"
             else -> mensaje
         }
     }

@@ -34,6 +34,7 @@ fun NuevoMovimientoScreen(
 
     var tipo by remember { mutableStateOf("GASTO") }
     var monto by remember { mutableStateOf("") }
+    var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
 
     var cuentas by remember { mutableStateOf<List<CuentaDto>>(emptyList()) }
@@ -51,6 +52,8 @@ fun NuevoMovimientoScreen(
     var cargando by remember { mutableStateOf(true) }
     var guardando by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+
 
     LaunchedEffect(usuarioId) {
         try {
@@ -125,9 +128,9 @@ fun NuevoMovimientoScreen(
             )
 
             OutlinedTextField(
-                value = descripcion,
-                onValueChange = { descripcion = it },
-                label = { Text("Descripción") },
+                value = titulo,
+                onValueChange = { titulo = it },
+                label = { Text("Título") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -258,6 +261,7 @@ fun NuevoMovimientoScreen(
                                         categoriaId = categoria.id,
                                         metodoPagoId = metodo.id,
                                         monto = valor,
+                                        titulo = titulo.trim().ifBlank { null },
                                         descripcion = descripcion.trim().ifBlank { null }
                                     )
                                 )
@@ -268,6 +272,7 @@ fun NuevoMovimientoScreen(
                                         categoriaId = categoria.id,
                                         metodoPagoId = metodo.id,
                                         monto = valor,
+                                        titulo = titulo.trim().ifBlank { null },
                                         descripcion = descripcion.trim().ifBlank { null }
                                     )
                                 )

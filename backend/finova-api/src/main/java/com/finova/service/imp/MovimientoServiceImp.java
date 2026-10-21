@@ -16,6 +16,7 @@ import com.finova.repository.MetaRepository;
 import com.finova.repository.MetodoPagoRepository;
 import com.finova.repository.MovimientoRepository;
 import com.finova.service.MovimientoService;
+import com.finova.dto.EditarMovimientoRequestDTO;
 
 import lombok.RequiredArgsConstructor;
 
@@ -99,16 +100,27 @@ public class MovimientoServiceImp implements MovimientoService {
                     return cuentaOrigenPertenece || cuentaDestinoPertenece;
                 })
                 .sorted((a, b) -> {
-                    if (a.getFechaMovimiento() == null) {
-                        return b.getFechaMovimiento() == null ? 0 : 1;
+                    if (a.getFechaMovimiento() == null
+                            && b.getFechaMovimiento() != null) {
+                        return 1;
                     }
 
-                    if (b.getFechaMovimiento() == null) {
+                    if (a.getFechaMovimiento() != null
+                            && b.getFechaMovimiento() == null) {
                         return -1;
                     }
 
-                    return b.getFechaMovimiento()
-                            .compareTo(a.getFechaMovimiento());
+                    if (a.getFechaMovimiento() != null) {
+                        int comparacion = b.getFechaMovimiento()
+                                .compareTo(a.getFechaMovimiento());
+
+                        if (comparacion != 0) {
+                            return comparacion;
+                        }
+                    }
+
+                    // Si las fechas coinciden, mostrar primero el ID más reciente.
+                    return Long.compare(b.getId(), a.getId());
                 })
                 .toList();
     }
@@ -528,7 +540,7 @@ public class MovimientoServiceImp implements MovimientoService {
 
         movimiento.setTipoMovimiento(request.getTipoMovimiento());
         movimiento.setMonto(request.getMonto());
-        movimiento.setFechaMovimiento(request.getFechaMovimiento());
+        movimiento.setFechaMovimiento(LocalDateTime.now());
         movimiento.setTitulo(request.getNombreComercio());
         movimiento.setDescripcion(request.getDescripcion());
 
@@ -1020,7 +1032,43 @@ public class MovimientoServiceImp implements MovimientoService {
             );
         }
     }
+    
+    @Override
+    @Transactional
+    public void editarMovimiento(Long id, EditarMovimientoRequestDTO request) {
+        if (request == null) {
+            throw new ReglaNegocioException("Los datos son obligatorios");
+        }
 
+        Movimiento existente = buscarPorId(id);
+
+        if (request.getTitulo() == null || request.getTitulo().trim().isEmpty()) {
+            throw new ReglaNegocioException("El título es obligatorio");
+        }
+
+        validarMonto(request.getMonto());
+
+        if (request.getCategoriaId() == null) {
+            throw new ReglaNegocioException("La categoría es obligatoria");
+        }
+
+        Categoria categoria = categoriaRepository.findById(request.getCategoriaId())
+                .orElseThrow(() ->
+                        new RecursoNoEncontradoException("Categoría no encontrada")
+                );
+
+        validarCategoriaParaMovimiento(categoria, existente.getTipoMovimiento());
+
+        revertirMovimiento(existente);
+
+        existente.setTitulo(request.getTitulo().trim());
+        existente.setMonto(request.getMonto());
+        existente.setCategoria(categoria);
+
+        aplicarMovimiento(existente);
+
+        movimientoRepository.save(existente);
+    }
 
 
     // =========================================================

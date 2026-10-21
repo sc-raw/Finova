@@ -40,6 +40,8 @@ private data class MovimientoHistorial(
     val subtitulo: String,
     val monto: Double,
     val esIngreso: Boolean,
+    val esTransferencia: Boolean,
+    val esMeta: Boolean,
     val cuenta: String,
     val icono: ImageVector,
     val tieneIa: Boolean = false
@@ -57,8 +59,6 @@ fun HistorialScreen(
     onMovimientoClick: (Long) -> Unit,
     viewModel: MovimientosViewModel = viewModel()
 ) {
-    var mostrarSheet by remember { mutableStateOf(false) }
-
     val cargando by viewModel.cargando.collectAsState()
     val error by viewModel.error.collectAsState()
     val movimientosDto by viewModel.movimientosFiltrados.collectAsState()
@@ -73,14 +73,7 @@ fun HistorialScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { HistorialTopBar() },
-        bottomBar = {
-            BottomNavBar(
-                currentRoute = "historial",
-                onNavigate = onNavigate,
-                onScanClick = { mostrarSheet = true }
-            )
-        }
+        topBar = { HistorialTopBar(onBack = { onNavigate("dashboard") }) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -184,6 +177,20 @@ fun HistorialScreen(
                         seleccionado = filtroActual == FiltroMovimiento.INGRESOS,
                         dotColor = FinovaSecondary,
                         onClick = { viewModel.cambiarFiltro(FiltroMovimiento.INGRESOS) }
+                    )
+                    FilterChipHistorial(
+                        texto = "Transferencias",
+                        seleccionado = filtroActual == FiltroMovimiento.TRANSFERENCIAS,
+                        dotColor = Color(0xFFEF8C32),
+                        icono = Icons.Outlined.SwapHoriz,
+                        onClick = { viewModel.cambiarFiltro(FiltroMovimiento.TRANSFERENCIAS) }
+                    )
+                    FilterChipHistorial(
+                        texto = "Metas",
+                        seleccionado = filtroActual == FiltroMovimiento.METAS,
+                        dotColor = FinovaPrimary,
+                        icono = Icons.Outlined.Savings,
+                        onClick = { viewModel.cambiarFiltro(FiltroMovimiento.METAS) }
                     )
                 }
             }
@@ -313,19 +320,7 @@ fun HistorialScreen(
         }
     }
 
-    // ---------- Bottom Sheet ----------
-    if (mostrarSheet) {
-        NuevaTransaccionSheet(
-            onDismiss = { mostrarSheet = false },
-            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
-            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
-            onAgregarManual = {
-                mostrarSheet = false
-                onNavigate("nuevo_movimiento")
-            },
-            onTransferir = { mostrarSheet = false; onNavigate("transferir") }
-        )
-    }
+
 }
 
 // ============================================================
@@ -334,18 +329,15 @@ fun HistorialScreen(
 
 private fun MovimientoDto.toHistorialVisual(): MovimientoHistorial {
     val esIngreso = tipoMovimiento == "INGRESO"
+    val esTransferencia = tipoMovimiento == "TRANSFERENCIA"
+    val esMeta = tipoMovimiento == "APORTE_META" || tipoMovimiento == "RETIRO_META"
 
     val icono: ImageVector = when {
         tipoMovimiento == "TRANSFERENCIA" -> Icons.Outlined.SwapHoriz
         tipoMovimiento == "APORTE_META" -> Icons.Outlined.Savings
         tipoMovimiento == "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
-        categoriaNombre?.contains("Alimenta", ignoreCase = true) == true -> Icons.Outlined.ShoppingCart
-        categoriaNombre?.contains("Salud", ignoreCase = true) == true -> Icons.Outlined.Medication
-        categoriaNombre?.contains("Transporte", ignoreCase = true) == true -> Icons.Outlined.DirectionsCar
-        categoriaNombre?.contains("Servicios", ignoreCase = true) == true -> Icons.Outlined.Bolt
-        categoriaNombre?.contains("Salario", ignoreCase = true) == true -> Icons.Outlined.Payments
         esIngreso -> Icons.Outlined.SouthWest
-        else -> Icons.Outlined.Receipt
+        else -> Icons.Outlined.NorthEast
     }
 
     val hora = extraerHora(fechaMovimiento)
@@ -360,10 +352,15 @@ private fun MovimientoDto.toHistorialVisual(): MovimientoHistorial {
 
     return MovimientoHistorial(
         id = id,
-        titulo = descripcion ?: "Movimiento",
+        titulo = titulo?.takeIf { it.isNotBlank() }
+            ?: descripcion?.takeIf { it.isNotBlank() }
+            ?: categoriaNombre?.takeIf { it.isNotBlank() }
+            ?: "Movimiento",
         subtitulo = subtitulo,
         monto = monto ?: 0.0,
         esIngreso = esIngreso,
+        esTransferencia = esTransferencia,
+        esMeta = esMeta,
         cuenta = cuentaOrigenNombre ?: cuentaDestinoNombre ?: "",
         icono = icono,
         tieneIa = false
@@ -391,22 +388,32 @@ private fun agruparPorFecha(
     dtos: List<MovimientoDto>
 ): List<GrupoFecha> {
 
-    val fechaPorId = dtos.associate { it.id to it.fechaMovimiento }
-
-    val map = mutableMapOf<String, MutableList<MovimientoHistorial>>()
-    visuales.forEach { mov ->
-        val fecha = fechaPorId[mov.id]?.take(10) ?: "Sin fecha"
-        map.getOrPut(fecha) { mutableListOf() }.add(mov)
+    val fechaPorId = dtos.associate {
+        it.id to it.fechaMovimiento
     }
 
+    val map = visuales
+        .sortedByDescending { fechaPorId[it.id] ?: "" }
+        .groupBy { mov ->
+            fechaPorId[mov.id]?.take(10) ?: "Sin fecha"
+        }
+
     return map.map { (fecha, lista) ->
-        val totalDia = lista.sumOf { if (it.esIngreso) it.monto else -it.monto }
+        val totalDia = lista.sumOf {
+            if (it.esIngreso) it.monto else -it.monto
+        }
+
         GrupoFecha(
             fecha = formatearEtiquetaFecha(fecha),
             totalDia = totalDia,
             movimientos = lista
         )
-    }.sortedByDescending { it.fecha }
+    }.sortedByDescending { grupo ->
+        // Ordenar por fecha ISO, no por la etiqueta visual.
+        map.keys.firstOrNull { fecha ->
+            formatearEtiquetaFecha(fecha) == grupo.fecha
+        } ?: ""
+    }
 }
 
 // Formatea "2025-01-15" a "HOY · 15 ENE" sin java.time
@@ -457,7 +464,7 @@ private fun formatearEtiquetaFecha(fechaISO: String): String {
 // ============================================================
 
 @Composable
-private fun HistorialTopBar() {
+private fun HistorialTopBar(onBack: () -> Unit) {
     Surface(
         color = FinovaSurface,
         shadowElevation = 1.dp
@@ -468,7 +475,7 @@ private fun HistorialTopBar() {
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { }) {
+            IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Volver",
@@ -563,9 +570,25 @@ private fun MovimientoHistorialRow(
     mov: MovimientoHistorial,
     onClick: () -> Unit
 ) {
-    val iconBg = if (mov.esIngreso) FinovaSecondaryContainer
-    else FinovaSurfaceContainerHigh
-    val iconTint = if (mov.esIngreso) FinovaSecondary else FinovaPrimary
+    val colorTransferencia = Color(0xFFEF8C32)
+    val iconTint = when {
+        mov.esTransferencia -> colorTransferencia
+        mov.esMeta -> FinovaPrimary
+        mov.esIngreso -> FinovaSecondary
+        else -> FinovaExpenseRed
+    }
+    val iconBg = when {
+        mov.esTransferencia -> Color(0xFFFFE5CC)
+        mov.esMeta -> FinovaPrimaryContainer.copy(alpha = 0.45f)
+        mov.esIngreso -> FinovaSecondaryFixed.copy(alpha = 0.5f)
+        else -> FinovaErrorContainer.copy(alpha = 0.6f)
+    }
+    val colorMonto = when {
+        mov.esTransferencia -> colorTransferencia
+        mov.esMeta -> FinovaPrimary
+        mov.esIngreso -> FinovaSecondary
+        else -> FinovaError
+    }
 
     Row(
         modifier = Modifier
@@ -619,9 +642,13 @@ private fun MovimientoHistorialRow(
         Spacer(Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "${if (mov.esIngreso) "+" else "-"}${formatSoles(mov.monto)}",
+                text = when {
+                    mov.esTransferencia -> formatSoles(mov.monto)
+                    mov.esIngreso -> "+${formatSoles(mov.monto)}"
+                    else -> "-${formatSoles(mov.monto)}"
+                },
                 style = FinovaTitleMd,
-                color = if (mov.esIngreso) FinovaSecondary else FinovaError,
+                color = colorMonto,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(2.dp))

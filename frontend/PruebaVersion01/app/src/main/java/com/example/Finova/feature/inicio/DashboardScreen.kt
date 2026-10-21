@@ -67,7 +67,8 @@ fun DashboardScreen(
 
     // --- Mapear DTOs a modelo visual ---
     val movimientos: List<MovimientoVisual> = movimientosDto
-        .take(5)
+        .sortedByDescending { it.fechaMovimiento ?: "" }
+        .take(8)
         .map { dto -> dto.toVisual() }
 
     val nombre = viewModel.nombresUsuario.ifBlank { "Usuario" }
@@ -77,9 +78,6 @@ fun DashboardScreen(
     val tipoCambio = viewModel.tipoCambio
     val ingresosMes = viewModel.ingresosMes
     val gastosMes = viewModel.gastosMes
-    val presupuestoPct = 74
-    val presupuestoRestante = 1420.00
-    val presupuestoTotal = 5500.00
 
     val selectorImagen = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -163,15 +161,14 @@ fun DashboardScreen(
                 Spacer(Modifier.height(24.dp))
                 SeccionTitulo(
                     titulo = "Operaciones rápidas",
-                    accionTexto = "Ver cuentas",
-                    onAccionClick = { onNavigate("mis_cuentas") }
+
                 )
                 Spacer(Modifier.height(12.dp))
                 OperacionesRapidas(
                     onTransferir = { onNavigate("transferir") },
-                    onCambiarDolares = { },
-                    onPagarServicios = { },
-                    onFinearCelular = { }
+                    onCambiarDolares = { /* La pantalla de cambio de dólares aún no está registrada en la navegación. */ },
+                    onNuevoMovimiento = { onNavigate("nuevo_movimiento") },
+                    onMisCuentas = { onNavigate("mis_cuentas") }
                 )
             }
 
@@ -204,15 +201,6 @@ fun DashboardScreen(
                 }
             }
 
-            item {
-                Spacer(Modifier.height(16.dp))
-                PresupuestoMesCard(
-                    porcentaje = presupuestoPct,
-                    restante = presupuestoRestante,
-                    total = presupuestoTotal
-                )
-                Spacer(Modifier.height(24.dp))
-            }
         }
     }
 
@@ -231,10 +219,6 @@ fun DashboardScreen(
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
-            },
-            onTransferir = {
-                mostrarSheet = false
-                onNavigate("transferir")
             }
         )
     }
@@ -252,7 +236,7 @@ private fun MovimientoDto.toVisual(): MovimientoVisual {
         tipoMovimiento == "APORTE_META" -> Icons.Outlined.Savings
         tipoMovimiento == "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
         esIngreso -> Icons.Outlined.SouthWest
-        else -> Icons.Outlined.ShoppingCart
+        else -> Icons.Outlined.NorthEast
     }
 
     val subtitulo = buildString {
@@ -264,7 +248,7 @@ private fun MovimientoDto.toVisual(): MovimientoVisual {
     }
 
     return MovimientoVisual(
-        titulo = descripcion ?: "Movimiento",
+        titulo = titulo ?: descripcion ?: "Movimiento",
         subtitulo = subtitulo,
         monto = monto ?: 0.0,
         esIngreso = esIngreso,
@@ -546,8 +530,8 @@ private fun SeccionTitulo(
 private fun OperacionesRapidas(
     onTransferir: () -> Unit,
     onCambiarDolares: () -> Unit,
-    onPagarServicios: () -> Unit,
-    onFinearCelular: () -> Unit
+    onNuevoMovimiento: () -> Unit,
+    onMisCuentas: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -556,9 +540,9 @@ private fun OperacionesRapidas(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         OperacionItem("Transferir", Icons.Outlined.SwapHoriz, onTransferir, Modifier.weight(1f))
-        OperacionItem("Cambiar a\nDólares", Icons.Outlined.CurrencyExchange, onCambiarDolares, Modifier.weight(1f))
-        OperacionItem("Pagar\nservicios", Icons.Outlined.ReceiptLong, onPagarServicios, Modifier.weight(1f))
-        OperacionItem("Finear a\ncelular", Icons.Outlined.Smartphone, onFinearCelular, Modifier.weight(1f))
+        OperacionItem("Cambiar\ndólares", Icons.Outlined.CurrencyExchange, onCambiarDolares, Modifier.weight(1f))
+        OperacionItem("Nuevo\nmovimiento", Icons.Outlined.AddCircleOutline, onNuevoMovimiento, Modifier.weight(1f))
+        OperacionItem("Mis\ncuentas", Icons.Outlined.AccountBalanceWallet, onMisCuentas, Modifier.weight(1f))
     }
 }
 
@@ -703,76 +687,5 @@ private fun IaBadge() {
             style = FinovaLabelSm,
             color = FinovaAiAccent
         )
-    }
-}
-
-@Composable
-private fun PresupuestoMesCard(
-    porcentaje: Int,
-    restante: Double,
-    total: Double
-) {
-    FinovaSoftCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        cornerRadius = 16.dp,
-        padding = 16.dp,
-        containerColor = FinovaSurfaceContainerLow
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    progress = { porcentaje / 100f },
-                    modifier = Modifier.size(48.dp),
-                    color = FinovaPrimary,
-                    trackColor = FinovaSurfaceContainerHigh,
-                    strokeWidth = 4.dp
-                )
-                Text(
-                    text = "$porcentaje%",
-                    style = FinovaLabelMd,
-                    color = FinovaPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Presupuesto del mes",
-                    style = FinovaLabelLg,
-                    color = FinovaOnSurface
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "Te quedan ${formatSoles(restante)} de ${formatSoles(total)}",
-                    style = FinovaBodySm,
-                    color = FinovaOnSurfaceVariant
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(FinovaSurfaceContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = FinovaPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
     }
 }

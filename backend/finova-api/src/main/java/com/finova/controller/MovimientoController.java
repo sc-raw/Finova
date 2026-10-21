@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.finova.dto.ConfirmarComprobanteRequestDTO;
+import com.finova.dto.EditarMovimientoRequestDTO;
 
 import java.util.List;
 
@@ -53,6 +54,15 @@ public class MovimientoController {
                         .map(MovimientoResponseDTO::desdeEntidad)
                         .toList()
         );
+    }
+    
+    @PatchMapping("/{id}/editar")
+    public ResponseEntity<Void> editarMovimiento(
+            @PathVariable Long id,
+            @RequestBody EditarMovimientoRequestDTO request) {
+
+        movimientoService.editarMovimiento(id, request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")

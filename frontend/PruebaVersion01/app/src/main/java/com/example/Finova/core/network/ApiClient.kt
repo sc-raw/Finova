@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
 
     // Para el emulador de Android Studio
-    private const val BASE_URL = "http://192.168.18.15:8080/"
+    private const val BASE_URL = "http://192.168.18.66:8080/"
 
     private const val PREFS_NAME = "finova_session"
     private const val TOKEN_KEY = "token"

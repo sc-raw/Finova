@@ -1,5 +1,11 @@
 package com.example.Finova.feature.movimientos
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.theme.*
 import com.example.Finova.core.network.dto.MovimientoDto
 import com.example.Finova.core.util.formatSoles
+import androidx.compose.ui.text.style.TextAlign
 
 // ============================================================
 // FINOVA — Detalle de Movimiento
@@ -34,9 +41,12 @@ import com.example.Finova.core.util.formatSoles
 fun DetalleMovimientoScreen(
     movimientoId: Long,
     onBack: () -> Unit,
+    onEdit: (Long) -> Unit,
     viewModel: MovimientosViewModel = viewModel()
 ) {
-    var iaExpandida by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var consultandoBoleta by remember { mutableStateOf(false) }
 
     val cargando by viewModel.cargando.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -86,6 +96,9 @@ fun DetalleMovimientoScreen(
         }
 
         movimiento?.let { mov ->
+            val permiteAcciones = mov.tipoMovimiento != "TRANSFERENCIA" &&
+                    mov.tipoMovimiento != "APORTE_META" &&
+                    mov.tipoMovimiento != "RETIRO_META"
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -126,39 +139,40 @@ fun DetalleMovimientoScreen(
                     }
                     Spacer(Modifier.height(10.dp))
 
-                    FilaDetalle(
-                        icono = Icons.Outlined.Restaurant,
-                        iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
-                        iconTint = FinovaSecondary,
-                        label = "Categoría",
-                        valorChip = mov.categoriaNombre ?: "Sin categoría"
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    if (mov.tipoMovimiento != "TRANSFERENCIA") {
+                        FilaDetalle(
+                            icono = Icons.Outlined.Category,
+                            iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
+                            iconTint = FinovaSecondary,
+                            label = "Categoría",
+                            valorChip = mov.categoriaNombre ?: "Sin categoría"
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
                     FilaDetalle(
                         icono = Icons.Outlined.AccountBalance,
-                        iconBg = FinovaPrimary.copy(alpha = 0.1f),
-                        iconTint = FinovaPrimary,
+                        iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
+                        iconTint = FinovaSecondary,
                         label = mov.cuentaOrigenNombre
                             ?: mov.cuentaDestinoNombre
                             ?: "Cuenta",
-                        sublabel = "•••• ${(mov.cuentaOrigenId ?: 0L).toString().takeLast(4)}",
-                        valorChip = mov.tipoMovimiento ?: "",
-                        chipColor = FinovaSecondaryContainer.copy(alpha = 0.4f),
-                        chipTextoColor = FinovaSecondary
+                        valorTexto = "•••• ${(mov.cuentaOrigenId ?: mov.cuentaDestinoId ?: 0L).toString().takeLast(1)}"
                     )
-                    Spacer(Modifier.height(6.dp))
-                    FilaDetalle(
-                        icono = Icons.Outlined.CreditCard,
-                        iconBg = FinovaSurfaceContainerHigh,
-                        iconTint = FinovaOnSurfaceVariant,
-                        label = "Método de pago",
-                        valorTexto = mov.metodoPagoNombre ?: "No especificado"
-                    )
+                    if (mov.tipoMovimiento != "TRANSFERENCIA") {
+                        Spacer(Modifier.height(6.dp))
+                        FilaDetalle(
+                            icono = Icons.Outlined.CreditCard,
+                            iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
+                            iconTint = FinovaSecondary,
+                            label = "Método de pago",
+                            valorTexto = mov.metodoPagoNombre ?: "No especificado"
+                        )
+                    }
                     Spacer(Modifier.height(6.dp))
                     FilaDetalle(
                         icono = Icons.Outlined.Tag,
-                        iconBg = FinovaSurfaceContainerHigh,
-                        iconTint = FinovaOnSurfaceVariant,
+                        iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
+                        iconTint = FinovaSecondary,
                         label = "Operación TRX",
                         valorTexto = "#${mov.id.toString().padStart(6, '0')}",
                         trailingIcono = Icons.Outlined.ContentCopy
@@ -167,176 +181,141 @@ fun DetalleMovimientoScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // ---------- Luka Bot IA ----------
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(FinovaSurfaceContainerLow)
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(FinovaTertiaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SmartToy,
-                                contentDescription = null,
-                                tint = FinovaOnTertiary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Luka Bot Smart Audit",
-                                    style = FinovaLabelLg,
-                                    color = FinovaOnSurface
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .background(FinovaSecondaryContainer)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "98% conf.",
-                                        style = FinovaLabelSm,
-                                        color = FinovaOnSecondaryContainer,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                // ---------- Acciones para movimientos manuales ----------
+                if (permiteAcciones) {
+                    // ---------- Botón Ver boleta ----------
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                consultandoBoleta = true
+                                try {
+                                    val comprobante = com.example.Finova.core.network.ApiClient.apiService
+                                        .obtenerComprobantePorMovimiento(mov.id)
+                                    val ruta = comprobante.rutaComprobante?.trim().orEmpty()
+
+                                    if (ruta.isBlank()) {
+                                        Toast.makeText(
+                                            context,
+                                            "Este movimiento no tiene una boleta adjunta.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        val uri = when {
+                                            ruta.startsWith("http://", true) ||
+                                                    ruta.startsWith("https://", true) ||
+                                                    ruta.startsWith("content://", true) ||
+                                                    ruta.startsWith("file://", true) -> Uri.parse(ruta)
+                                            else -> Uri.fromFile(java.io.File(ruta))
+                                        }
+                                        val mimeType = if (ruta.substringBefore("?")
+                                                .endsWith(".pdf", ignoreCase = true)
+                                        ) "application/pdf" else "image/*"
+
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, mimeType)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "No se pudo abrir la boleta. Verifica que exista un comprobante asociado.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    consultandoBoleta = false
                                 }
                             }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "Extracción automática de comprobante",
-                                style = FinovaBodySm,
-                                color = FinovaOnSurfaceVariant
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(FinovaSurfaceContainer)
-                                .clickable { iaExpandida = !iaExpandida },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (iaExpandida) Icons.Default.ExpandLess
-                                else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = FinovaOnSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    if (iaExpandida) {
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            MiniFiscalCard("Subtotal", formatSoles((mov.monto ?: 0.0) / 1.18), Modifier.weight(1f))
-                            MiniFiscalCard("IGV (18%)", formatSoles((mov.monto ?: 0.0) * 0.18 / 1.18), Modifier.weight(1f))
-                            MiniFiscalCard("RUC Emisor", "20600023451", Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // ---------- Botones ----------
-                Button(
-                    onClick = { },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = FinovaPrimary,
-                        contentColor = FinovaOnPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Compartir comprobante",
-                        style = FinovaLabelLg
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { },
+                        },
+                        enabled = !consultandoBoleta,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
+                            .fillMaxWidth()
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = FinovaSurfaceContainerHigh,
-                            contentColor = FinovaOnSurface
+                            containerColor = FinovaPrimary,
+                            contentColor = FinovaOnPrimary
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = FinovaPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Editar",
-                            style = FinovaLabelMd,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.eliminarMovimiento(mov.id) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = !eliminando,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FinovaErrorContainer.copy(alpha = 0.6f),
-                            contentColor = FinovaError
-                        )
-                    ) {
-                        if (eliminando) {
+                        if (consultandoBoleta) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = FinovaError,
+                                modifier = Modifier.size(18.dp),
+                                color = FinovaOnPrimary,
                                 strokeWidth = 2.dp
                             )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Buscando boleta...", style = FinovaLabelLg)
                         } else {
                             Icon(
-                                imageVector = Icons.Default.Delete,
+                                imageVector = Icons.Outlined.ReceiptLong,
                                 contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Ver boleta", style = FinovaLabelLg)
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ---------- Editar y eliminar ----------
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onEdit(mov.id) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FinovaSurfaceContainerHigh,
+                                contentColor = FinovaOnSurface
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = FinovaPrimary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Eliminar",
+                                text = "Editar",
                                 style = FinovaLabelMd,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+                        Button(
+                            onClick = { viewModel.eliminarMovimiento(mov.id) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !eliminando,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FinovaErrorContainer.copy(alpha = 0.6f),
+                                contentColor = FinovaError
+                            )
+                        ) {
+                            if (eliminando) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = FinovaError,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "Eliminar",
+                                    style = FinovaLabelMd,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -353,30 +332,42 @@ fun DetalleMovimientoScreen(
 
 @Composable
 private fun HeroCardDetalle(mov: MovimientoDto) {
-    val esIngreso = mov.tipoMovimiento == "INGRESO"
+    val tipo = mov.tipoMovimiento.orEmpty()
+    val tipoOperacion = when (tipo) {
+        "TRANSFERENCIA" -> "Transferencia"
+        "INGRESO" -> "Ingreso"
+        "GASTO" -> "Gasto"
+        "APORTE_META" -> "Aporte a meta"
+        "RETIRO_META" -> "Retiro de meta"
+        else -> "Movimiento"
+    }
 
-    val icono: ImageVector = when {
-        mov.tipoMovimiento == "TRANSFERENCIA" -> Icons.Outlined.SwapHoriz
-        mov.tipoMovimiento == "APORTE_META" -> Icons.Outlined.Savings
-        mov.tipoMovimiento == "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
-        mov.categoriaNombre?.contains("Alimenta", ignoreCase = true) == true -> Icons.Outlined.ShoppingCart
-        mov.categoriaNombre?.contains("Salud", ignoreCase = true) == true -> Icons.Outlined.Medication
-        mov.categoriaNombre?.contains("Transporte", ignoreCase = true) == true -> Icons.Outlined.DirectionsCar
-        mov.categoriaNombre?.contains("Servicios", ignoreCase = true) == true -> Icons.Outlined.Bolt
-        esIngreso -> Icons.Outlined.SouthWest
+    val icono: ImageVector = when (tipo) {
+        "TRANSFERENCIA" -> Icons.Outlined.SwapHoriz
+        "INGRESO" -> Icons.Outlined.SouthWest
+        "GASTO" -> Icons.Outlined.NorthEast
+        "APORTE_META" -> Icons.Outlined.Savings
+        "RETIRO_META" -> Icons.Outlined.AccountBalanceWallet
         else -> Icons.Outlined.Receipt
     }
 
-    val iconBg = if (esIngreso)
-        FinovaSecondaryContainer.copy(alpha = 0.4f)
-    else FinovaSurfaceContainerHigh
-
-    val iconTint = if (esIngreso) FinovaSecondary else FinovaPrimary
-
-    val colorMonto = if (esIngreso) FinovaSecondary else FinovaError
-    val signo = if (esIngreso) "+" else "-"
-
-    // Formatear fecha para mostrar
+    val colorOperacion = when (tipo) {
+        "INGRESO", "APORTE_META" -> FinovaSecondary
+        "GASTO", "RETIRO_META" -> FinovaError
+        "TRANSFERENCIA" -> Color(0xFFEF8C32)
+        else -> FinovaSecondary
+    }
+    val fondoOperacion = when (tipo) {
+        "INGRESO", "APORTE_META" -> FinovaSecondaryContainer.copy(alpha = 0.45f)
+        "GASTO", "RETIRO_META" -> FinovaErrorContainer.copy(alpha = 0.45f)
+        "TRANSFERENCIA" -> Color(0xFFFFE5CC)
+        else -> FinovaSecondaryContainer.copy(alpha = 0.45f)
+    }
+    val signo = when (tipo) {
+        "INGRESO", "APORTE_META" -> "+"
+        "TRANSFERENCIA" -> ""
+        else -> "-"
+    }
     val fechaMostrar = formatearFechaDetalle(mov.fechaMovimiento)
 
     Column(
@@ -387,25 +378,35 @@ private fun HeroCardDetalle(mov: MovimientoDto) {
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            text = tipoOperacion,
+            style = FinovaTitleMd,
+            color = colorOperacion,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(12.dp))
         Box(
             modifier = Modifier
                 .size(64.dp)
                 .clip(CircleShape)
-                .background(iconBg),
+                .background(fondoOperacion),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icono,
-                contentDescription = null,
-                tint = iconTint,
+                contentDescription = tipoOperacion,
+                tint = colorOperacion,
                 modifier = Modifier.size(32.dp)
             )
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            text = mov.descripcion ?: "Movimiento",
+            text = mov.titulo?.takeIf { it.isNotBlank() }
+                ?: mov.descripcion ?: "Movimiento",
             style = FinovaHeadlineMd,
-            color = FinovaOnSurface
+            color = FinovaOnSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(4.dp))
         Text(
@@ -417,7 +418,7 @@ private fun HeroCardDetalle(mov: MovimientoDto) {
         Text(
             text = "$signo${formatSoles(mov.monto ?: 0.0)}",
             style = FinovaDisplayLgMobile,
-            color = colorMonto,
+            color = colorOperacion,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(16.dp))
@@ -432,7 +433,7 @@ private fun HeroCardDetalle(mov: MovimientoDto) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = FinovaPrimary,
+                    tint = FinovaSecondary,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(4.dp))
@@ -480,32 +481,39 @@ private fun DetalleTopBar(onBack: () -> Unit) {
         color = FinovaSurface,
         shadowElevation = 1.dp
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .height(56.dp)
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = FinovaOnSurface
-                )
-            }
-            Spacer(Modifier.width(4.dp))
             Text(
                 text = "Detalle De Movimiento",
                 style = FinovaTitleMd,
                 color = FinovaOnSurface,
-                modifier = Modifier.weight(1f)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 280.dp)
             )
-            IconButton(onClick = { }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Más",
-                    tint = FinovaOnSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = FinovaOnSurface
+                    )
+                }
+                IconButton(onClick = { }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Más",
+                        tint = FinovaSecondary
+                    )
+                }
             }
         }
     }

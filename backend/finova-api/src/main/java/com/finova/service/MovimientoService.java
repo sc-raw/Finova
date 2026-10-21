@@ -1,5 +1,6 @@
 package com.finova.service;
 
+import com.finova.dto.EditarMovimientoRequestDTO;
 import com.finova.entity.Movimiento;
 
 import java.math.BigDecimal;
@@ -63,4 +64,6 @@ public interface MovimientoService {
     );
 
     List<Movimiento> listarPorCuenta(Long cuentaId);
+    
+    void editarMovimiento(Long id, EditarMovimientoRequestDTO request);
 }
