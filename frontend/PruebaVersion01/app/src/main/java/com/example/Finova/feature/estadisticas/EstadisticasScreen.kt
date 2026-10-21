@@ -15,6 +15,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +31,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.theme.*
 import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
+
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.example.Finova.core.network.ApiClient
+import java.text.NumberFormat
+import com.example.Finova.core.network.dto.EstadisticasResponseDto
+import com.example.Finova.core.util.SessionManager
+import java.util.Locale
 
 // ============================================================
 // FINOVA — Estadísticas
@@ -56,35 +68,152 @@ private data class ComparativaCategoria(
     val esPositivo: Boolean
 )
 
+
+
 @Composable
 fun EstadisticasScreen(
     onNavigate: (String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onImagenSeleccionada: (Uri) -> Unit
 ) {
+
+
     var periodoSeleccionado by remember { mutableStateOf("Mes") }
     var mostrarSheet by remember { mutableStateOf(false) }
 
-    val barras = listOf(
-        BarraMensual("Nov", 0.70f, 0.48f),
-        BarraMensual("Dic", 0.95f, 0.65f),
-        BarraMensual("Ene", 0.72f, 0.46f),
-        BarraMensual("Feb", 0.80f, 0.52f),
-        BarraMensual("Mar", 0.88f, 0.38f, esActual = true)
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+
+    var cargando by remember { mutableStateOf(false) }
+    var mensajeError by remember { mutableStateOf<String?>(null) }
+    var estadisticas by remember {
+        mutableStateOf<EstadisticasResponseDto?>(null)
+    }
+
+    val selectorImagen = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) onImagenSeleccionada(uri)
+    }
+
+    LaunchedEffect(periodoSeleccionado) {
+        val usuarioId = sessionManager.obtenerUsuarioId()
+
+        if (usuarioId <= 0L) {
+            estadisticas = null
+            mensajeError = "No se encontró una sesión válida."
+            return@LaunchedEffect
+        }
+
+        cargando = true
+        mensajeError = null
+
+        try {
+            estadisticas = withContext(Dispatchers.IO) {
+                ApiClient.apiService.obtenerEstadisticas(
+                    usuarioId = usuarioId,
+                    periodo = periodoSeleccionado.lowercase(Locale.ROOT)
+                )
+            }
+        } catch (e: Exception) {
+            mensajeError = "No se pudieron cargar las estadísticas."
+            android.util.Log.e(
+                "FinovaEstadisticas",
+                "Error al consultar estadísticas",
+                e
+            )
+        } finally {
+            cargando = false
+        }
+    }
+
+    val respuesta = estadisticas
+    val moneda = NumberFormat.getCurrencyInstance(Locale("es", "PE")).apply {
+        maximumFractionDigits = 2
+        minimumFractionDigits = 2
+        currency = java.util.Currency.getInstance("PEN")
+    }
+
+    fun formatoSoles(valor: Double): String = moneda.format(valor)
+
+    val totalIngresos = respuesta?.totalIngresos ?: 0.0
+    val totalGastos = respuesta?.totalGastos ?: 0.0
+    val tasaAhorro = respuesta?.tasaAhorro ?: 0.0
+
+    val coloresCategorias = listOf(
+        FinovaPrimary,
+        FinovaSecondary,
+        FinovaTertiary,
+        FinovaPrimaryFixedDim,
+        FinovaOutlineVariant
     )
 
-    val categorias = listOf(
-        CategoriaDona("Alimentación", 620.0, 40f, FinovaPrimary),
-        CategoriaDona("Servicios", 340.0, 22f, FinovaSecondary),
-        CategoriaDona("Transporte", 280.0, 18f, FinovaTertiary),
-        CategoriaDona("Entretenimiento", 210.0, 14f, FinovaPrimaryFixedDim),
-        CategoriaDona("Otros", 100.0, 6f, FinovaOutlineVariant)
-    )
+    fun colorDesdeHex(hex: String?, indice: Int): Color {
+        if (hex.isNullOrBlank()) return coloresCategorias[indice % coloresCategorias.size]
+        return try {
+            val limpio = hex.trim().removePrefix("#")
+            val colorLong = limpio.toLong(16)
+            when (limpio.length) {
+                6 -> Color((0xFF000000L or colorLong).toULong())
+                8 -> Color(colorLong.toULong())
+                else -> coloresCategorias[indice % coloresCategorias.size]
+            }
+        } catch (_: Exception) {
+            coloresCategorias[indice % coloresCategorias.size]
+        }
+    }
 
-    val comparativas = listOf(
-        ComparativaCategoria("Comida", Icons.Outlined.Restaurant, 4, "+$24 este mes", false),
-        ComparativaCategoria("Transporte", Icons.Outlined.DirectionsCar, -15, "-$48 vs Feb", true),
-        ComparativaCategoria("Ocio", Icons.Outlined.Movie, -8, "-$18 vs Feb", true)
-    )
+    val categorias = respuesta?.distribucionCategorias.orEmpty().mapIndexed { index, cat ->
+        CategoriaDona(
+            nombre = cat.nombre ?: "Sin categoría",
+            monto = cat.total ?: 0.0,
+            porcentaje = (cat.porcentaje ?: 0.0).toFloat().coerceAtLeast(0f),
+            color = colorDesdeHex(cat.color, index)
+        )
+    }
+
+    val evolucion = respuesta?.evolucionMensual.orEmpty()
+    val maxValorGrafico = (evolucion.maxOfOrNull {
+        maxOf(it.ingresos ?: 0.0, it.gastos ?: 0.0)
+    } ?: 0.0).coerceAtLeast(1.0)
+
+    val barras = evolucion.mapIndexed { index, mes ->
+        BarraMensual(
+            mes = mes.mes ?: "",
+            ingresos = ((mes.ingresos ?: 0.0) / maxValorGrafico).toFloat().coerceIn(0f, 1f),
+            gastos = ((mes.gastos ?: 0.0) / maxValorGrafico).toFloat().coerceIn(0f, 1f),
+            esActual = index == evolucion.lastIndex
+        )
+    }
+
+    fun porcentajeCambio(actual: Double, anterior: Double): Int {
+        if (anterior == 0.0) return if (actual > 0.0) 100 else 0
+        return (((actual - anterior) / kotlin.math.abs(anterior)) * 100).toInt()
+    }
+
+    val ingresosAnterior = respuesta?.ingresosAnterior ?: 0.0
+    val gastosAnterior = respuesta?.gastosAnterior ?: 0.0
+    val cambioIngresos = porcentajeCambio(totalIngresos, ingresosAnterior)
+    val cambioGastos = porcentajeCambio(totalGastos, gastosAnterior)
+
+    val comparativas = if (respuesta != null) {
+        listOf(
+            ComparativaCategoria(
+                nombre = "Ingresos",
+                icono = Icons.Outlined.TrendingUp,
+                porcentaje = cambioIngresos,
+                montoTexto = "${if (totalIngresos - ingresosAnterior >= 0) "+" else ""}${formatoSoles(totalIngresos - ingresosAnterior)}",
+                esPositivo = totalIngresos >= ingresosAnterior
+            ),
+            ComparativaCategoria(
+                nombre = "Gastos",
+                icono = Icons.Outlined.TrendingDown,
+                porcentaje = cambioGastos,
+                montoTexto = "${if (totalGastos - gastosAnterior >= 0) "+" else ""}${formatoSoles(totalGastos - gastosAnterior)}",
+                esPositivo = totalGastos <= gastosAnterior
+            )
+        )
+    } else emptyList()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -141,6 +270,24 @@ fun EstadisticasScreen(
                 }
             }
 
+            item {
+                if (cargando) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                mensajeError?.let { error ->
+                    Text(
+                        text = error,
+                        color = FinovaError,
+                        style = FinovaLabelMd,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             // ---------- 3 tarjetas de métricas ----------
             item {
                 Spacer(Modifier.height(16.dp))
@@ -153,8 +300,8 @@ fun EstadisticasScreen(
                     MetricCard(
                         icono = Icons.Outlined.TrendingUp,
                         label = "Ingresos",
-                        valor = "+$3,800",
-                        sub = "+8.4% vs ant.",
+                        valor = formatoSoles(totalIngresos),
+                        sub = if (respuesta != null) "${if (cambioIngresos >= 0) "+" else ""}${cambioIngresos}% vs ant." else "Sin datos",
                         iconTint = FinovaSecondary,
                         valorColor = FinovaSecondary,
                         modifier = Modifier.weight(1f)
@@ -162,8 +309,8 @@ fun EstadisticasScreen(
                     MetricCard(
                         icono = Icons.Outlined.TrendingDown,
                         label = "Gastos",
-                        valor = "-$1,550",
-                        sub = "-12.0% ahorro",
+                        valor = formatoSoles(totalGastos),
+                        sub = if (respuesta != null) "${if (cambioGastos >= 0) "+" else ""}${cambioGastos}% vs ant." else "Sin datos",
                         iconTint = FinovaError,
                         valorColor = FinovaError,
                         modifier = Modifier.weight(1f)
@@ -171,8 +318,8 @@ fun EstadisticasScreen(
                     MetricCard(
                         icono = Icons.Outlined.Savings,
                         label = "Tasa Ahorro",
-                        valor = "+59.2%",
-                        sub = "Excelente",
+                        valor = "${"%.1f".format(tasaAhorro)}%",
+                        sub = "Tasa de ahorro",
                         iconTint = FinovaPrimary,
                         valorColor = FinovaPrimary,
                         badge = true,
@@ -220,7 +367,7 @@ fun EstadisticasScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    GraficoBarras(barras = barras)
+                    GraficoBarras(barras = barras, maxValor = maxValorGrafico)
 
                     Spacer(Modifier.height(12.dp))
 
@@ -240,7 +387,7 @@ fun EstadisticasScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Gastaste un 12% menos en relación al mes pasado.",
+                            text = if (respuesta == null) "Las estadísticas aparecerán cuando haya datos disponibles." else "Datos actualizados según el período seleccionado.",
                             style = FinovaLabelMd,
                             color = FinovaOnSecondaryContainer
                         )
@@ -285,7 +432,7 @@ fun EstadisticasScreen(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "5 Categorías",
+                                text = "${categorias.size} Categorías",
                                 style = FinovaLabelSm,
                                 color = FinovaOnSurfaceVariant
                             )
@@ -300,7 +447,7 @@ fun EstadisticasScreen(
                     ) {
                         GraficoDona(
                             categorias = categorias,
-                            totalTexto = "$1,550",
+                            totalTexto = formatoSoles(totalGastos),
                             modifier = Modifier.size(140.dp)
                         )
                         Spacer(Modifier.width(16.dp))
@@ -336,7 +483,7 @@ fun EstadisticasScreen(
                             color = FinovaOnSurface
                         )
                         Text(
-                            text = "Febrero vs Marzo",
+                            text = when (periodoSeleccionado) { "Semana" -> "Semana anterior"; "Año" -> "Año anterior"; else -> "Mes anterior" },
                             style = FinovaLabelSm,
                             color = FinovaOnSurfaceVariant
                         )
@@ -348,6 +495,9 @@ fun EstadisticasScreen(
                     ) {
                         comparativas.forEach { comp ->
                             ComparativaCard(comp = comp, modifier = Modifier.weight(1f))
+                        }
+                        if (comparativas.isEmpty()) {
+                            Text("Sin datos para comparar.", style = FinovaLabelMd, color = FinovaOnSurfaceVariant)
                         }
                     }
                 }
@@ -389,13 +539,22 @@ fun EstadisticasScreen(
     if (mostrarSheet) {
         NuevaTransaccionSheet(
             onDismiss = { mostrarSheet = false },
-            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
-            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onEscanear = {
+                mostrarSheet = false
+                onNavigate("escanear")
+            },
+            onSubirImagen = {
+                mostrarSheet = false
+                selectorImagen.launch("image/*")
+            },
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
+            },
+            onTransferir = {
+                mostrarSheet = false
+                onNavigate("transferir")
             }
-
         )
     }
 }
@@ -562,8 +721,12 @@ private fun LeyendaPunto(color: Color, label: String) {
 }
 
 @Composable
-private fun GraficoBarras(barras: List<BarraMensual>) {
+private fun GraficoBarras(barras: List<BarraMensual>, maxValor: Double) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        if (barras.isEmpty()) {
+            Text("No hay evolución disponible para este período.", style = FinovaLabelMd, color = FinovaOnSurfaceVariant)
+            return@Column
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -573,7 +736,8 @@ private fun GraficoBarras(barras: List<BarraMensual>) {
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                listOf("$4k", "$2k", "$0").forEach { label ->
+                listOf(maxValor, maxValor / 2.0, 0.0).forEach { valorGuia ->
+                    val label = "S/ ${"%.0f".format(valorGuia)}"
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -749,7 +913,7 @@ private fun FilaCategoriaDona(cat: CategoriaDona) {
         )
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "$%.0f".format(cat.monto),
+                text = "S/ %.2f".format(cat.monto),
                 style = FinovaLabelSm,
                 color = FinovaOnSurface,
                 fontWeight = FontWeight.SemiBold

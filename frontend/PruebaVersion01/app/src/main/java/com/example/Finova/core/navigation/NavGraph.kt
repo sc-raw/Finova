@@ -113,10 +113,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     navController.popBackStack()
                 },
                 onTransferenciaExitosa = {
-                    navController.navigate(Screen.MisCuentas.route) {
-                        popUpTo(Screen.MisCuentas.route) {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) {
                             inclusive = true
                         }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -194,7 +195,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         // ---------- PERFIL ----------
         composable(Screen.Perfil.route) {
-            PerfilScreen(onNavigate = goTo)
+            PerfilScreen(
+                onNavigate = goTo,
+                onImagenSeleccionada = { uri ->
+                    navController.currentBackStackEntry?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+                    goTo(Screen.ComprobanteRevision.route)
+                }
+            )
         }
 
         composable(Screen.MisDatos.route) {
@@ -270,6 +278,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 onNavigate = goTo,
                 onBack = {
                     navController.popBackStack()
+                },
+                onImagenSeleccionada = { uri ->
+                    navController.currentBackStackEntry?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+                    goTo(Screen.ComprobanteRevision.route)
                 }
             )
         }
@@ -282,6 +295,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 },
                 onBack = {
                     navController.popBackStack()
+                },
+                onImagenSeleccionada = { uri ->
+                    navController.currentBackStackEntry?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+                    goTo(Screen.ComprobanteRevision.route)
                 }
             )
         }

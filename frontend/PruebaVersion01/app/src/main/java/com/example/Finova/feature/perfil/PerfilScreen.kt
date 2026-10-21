@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.components.*
 import com.example.Finova.core.design.theme.*
 import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
+import android.net.Uri
 
 // ============================================================
 // FINOVA — Perfil
@@ -30,7 +31,8 @@ import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
 
 @Composable
 fun PerfilScreen(
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    onImagenSeleccionada: (Uri) -> Unit
 ) {
     var mostrarSheet by remember { mutableStateOf(false) }
 
@@ -141,13 +143,23 @@ fun PerfilScreen(
     if (mostrarSheet) {
         NuevaTransaccionSheet(
             onDismiss = { mostrarSheet = false },
-            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
-            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onEscanear = {
+                mostrarSheet = false
+                onNavigate("escanear")
+            },
+            onSubirImagen = {
+                mostrarSheet = false
+                onNavigate("escanear")
+            },
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
             },
-            )
+            onTransferir = {
+                mostrarSheet = false
+                onNavigate("transferir")
+            }
+        )
     }
 }
 

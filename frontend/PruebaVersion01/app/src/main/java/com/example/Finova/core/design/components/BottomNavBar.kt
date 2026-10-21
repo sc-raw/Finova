@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,11 +32,11 @@ data class FinovaNavItem(
 )
 
 val finovaNavItems = listOf(
-    FinovaNavItem("dashboard",    "Inicio",       Icons.Outlined.Home),
+    FinovaNavItem("dashboard", "Inicio", Icons.Outlined.Home),
     FinovaNavItem("estadisticas", "Estadísticas", Icons.Outlined.BarChart),
-    FinovaNavItem("__fab__",      "",             Icons.Filled.QrCodeScanner),
-    FinovaNavItem("metas",        "Metas",        Icons.Outlined.Savings), // ✅ CORREGIDO: Ahora apunta a "metas"
-    FinovaNavItem("perfil",       "Perfil",       Icons.Outlined.Person)
+    FinovaNavItem("__scan__", "Escanear", Icons.Outlined.ReceiptLong),
+    FinovaNavItem("metas", "Metas", Icons.Outlined.Savings),
+    FinovaNavItem("perfil", "Configuración", Icons.Outlined.Settings)
 )
 
 @Composable
@@ -47,70 +46,75 @@ fun BottomNavBar(
     onScanClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val barHeight = 72.dp
-    val fabSize = 56.dp
-    val fabOverhang = fabSize / 2   // 28dp — cuánto sobresale el FAB
-
-    Column(modifier = modifier.fillMaxWidth()) {
-
-        // -------- Espacio reservado arriba para el FAB que sobresale --------
-        Spacer(Modifier.height(fabOverhang))
-
-        // -------- Barra + FAB --------
-        Box(
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = FinovaSurfaceContainerLowest,
+        shadowElevation = 8.dp
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(barHeight)
+                .height(76.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Barra blanca (fondo completo del Box)
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = FinovaSurfaceContainerLowest,
-                shadowElevation = 8.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    finovaNavItems.forEach { item ->
-                        if (item.route == "__fab__") {
-                            Spacer(modifier = Modifier.weight(1f))
-                        } else {
-                            NavItem(
-                                item = item,
-                                isActive = currentRoute == item.route,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onNavigate(item.route) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // FAB — pegado al borde SUPERIOR de la barra, sobresaliendo
-            // exactamente la mitad de su altura (28dp)
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = -fabOverhang)  // sube 28dp → queda mitad dentro, mitad fuera
-                    .size(fabSize),
-                shape = CircleShape,
-                color = FinovaAccentLightTeal,
-                shadowElevation = 10.dp,
-                onClick = onScanClick
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.QrCodeScanner,
-                        contentDescription = "Escanear comprobante",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
+            finovaNavItems.forEach { item ->
+                when (item.route) {
+                    "__scan__" -> ScanNavItem(
+                        item = item,
+                        modifier = Modifier.weight(1f),
+                        onClick = onScanClick
+                    )
+                    else -> NavItem(
+                        item = item,
+                        isActive = currentRoute == item.route,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onNavigate(item.route) }
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScanNavItem(
+    item: FinovaNavItem,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(horizontal = 2.dp, vertical = 4.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(
+                    color = FinovaPrimary,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(9.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = "Escanear comprobante",
+                tint = Color.White,
+                modifier = Modifier.size(21.dp)
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = item.label,
+            style = FinovaLabelSm,
+            color = FinovaOnSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -126,16 +130,40 @@ private fun NavItem(
     Column(
         modifier = modifier
             .fillMaxHeight()
+            .padding(horizontal = 2.dp, vertical = 4.dp)
+            .background(
+                color = if (isActive) FinovaSecondaryContainer.copy(alpha = 0.45f) else Color.Transparent,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            )
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = item.icon,
-            contentDescription = item.label,
-            tint = color,
-            modifier = Modifier.size(24.dp)
-        )
+        if (isActive) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(
+                        color = FinovaPrimary,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(9.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = item.label,
+                    tint = Color.White,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        } else {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.label,
+                tint = color,
+                modifier = Modifier.size(24.dp)
+            )
+        }
         Spacer(Modifier.height(2.dp))
         Text(
             text = item.label,

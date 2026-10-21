@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,9 +53,16 @@ private data class MetaVisual(
 fun MetasScreen(
     onNavigate: (String) -> Unit,
     onAnadirFondos: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onImagenSeleccionada: (Uri) -> Unit
 ) {
     var mostrarSheet by remember { mutableStateOf(false) }
+
+    val selectorImagen = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) onImagenSeleccionada(uri)
+    }
 
     val metas = listOf(
         MetaVisual(
@@ -250,13 +260,22 @@ fun MetasScreen(
     if (mostrarSheet) {
         NuevaTransaccionSheet(
             onDismiss = { mostrarSheet = false },
-            onEscanear = { mostrarSheet = false; onNavigate("escanear") },
-            onSubirImagen = { mostrarSheet = false; onNavigate("escanear") },
+            onEscanear = {
+                mostrarSheet = false
+                onNavigate("escanear")
+            },
+            onSubirImagen = {
+                mostrarSheet = false
+                selectorImagen.launch("image/*")
+            },
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
+            },
+            onTransferir = {
+                mostrarSheet = false
+                onNavigate("transferir")
             }
-
         )
     }
 }

@@ -32,6 +32,7 @@ fun NuevaTransaccionSheet(
     onEscanear: () -> Unit,
     onSubirImagen: () -> Unit,
     onAgregarManual: () -> Unit,
+    onTransferir: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 

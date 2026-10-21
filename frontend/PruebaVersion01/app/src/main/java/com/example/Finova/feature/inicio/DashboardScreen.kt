@@ -43,6 +43,7 @@ private data class MovimientoVisual(
     val subtitulo: String,
     val monto: Double,
     val esIngreso: Boolean,
+    val esTransferencia: Boolean,
     val cuenta: String,
     val icono: ImageVector,
     val tieneIa: Boolean = false
@@ -161,7 +162,8 @@ fun DashboardScreen(
                 Spacer(Modifier.height(24.dp))
                 SeccionTitulo(
                     titulo = "Operaciones rápidas",
-
+                    accionTexto = "Ver cuentas",
+                    onAccionClick = { onNavigate("mis_cuentas") }
                 )
                 Spacer(Modifier.height(12.dp))
                 OperacionesRapidas(
@@ -194,8 +196,7 @@ fun DashboardScreen(
             } else {
                 items(movimientos.size) { index ->
                     MovimientoRow(
-                        mov = movimientos[index],
-                        saldosOcultos = saldosOcultos
+                        mov = movimientos[index]
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -219,6 +220,10 @@ fun DashboardScreen(
             onAgregarManual = {
                 mostrarSheet = false
                 onNavigate("nuevo_movimiento")
+            },
+            onTransferir = {
+                mostrarSheet = false
+                onNavigate("transferir")
             }
         )
     }
@@ -252,6 +257,7 @@ private fun MovimientoDto.toVisual(): MovimientoVisual {
         subtitulo = subtitulo,
         monto = monto ?: 0.0,
         esIngreso = esIngreso,
+        esTransferencia = tipoMovimiento == "TRANSFERENCIA",
         cuenta = cuentaOrigenNombre ?: cuentaDestinoNombre ?: "",
         icono = icono,
         tieneIa = false
@@ -428,6 +434,7 @@ private fun HeroSaldoCard(
                 MiniStatCard(
                     label = "Ingresos",
                     valor = "+${formatSoles(ingresos)}",
+                    oculto = saldosOcultos,
                     icono = Icons.Outlined.ArrowDownward,
                     iconBg = FinovaSecondaryFixed.copy(alpha = 0.3f),
                     modifier = Modifier.weight(1f)
@@ -435,6 +442,7 @@ private fun HeroSaldoCard(
                 MiniStatCard(
                     label = "Gastos",
                     valor = "-${formatSoles(gastos)}",
+                    oculto = saldosOcultos,
                     icono = Icons.Outlined.ArrowUpward,
                     iconBg = FinovaError.copy(alpha = 0.3f),
                     modifier = Modifier.weight(1f)
@@ -448,6 +456,7 @@ private fun HeroSaldoCard(
 private fun MiniStatCard(
     label: String,
     valor: String,
+    oculto: Boolean,
     icono: ImageVector,
     iconBg: Color,
     modifier: Modifier = Modifier
@@ -481,7 +490,7 @@ private fun MiniStatCard(
                 color = FinovaOnPrimaryContainer.copy(alpha = 0.8f)
             )
             Text(
-                text = valor,
+                text = if (oculto) "••••••" else valor,
                 style = FinovaLabelLg,
                 color = FinovaOnPrimary,
                 maxLines = 1,
@@ -591,10 +600,17 @@ private fun OperacionItem(
 }
 
 @Composable
-private fun MovimientoRow(mov: MovimientoVisual, saldosOcultos: Boolean) {
-    val iconTint = if (mov.esIngreso) FinovaSecondary else FinovaExpenseRed
-    val iconBg = if (mov.esIngreso) FinovaSecondaryFixed.copy(alpha = 0.5f)
-    else FinovaErrorContainer.copy(alpha = 0.6f)
+private fun MovimientoRow(mov: MovimientoVisual) {
+    val iconTint = when {
+        mov.esTransferencia -> Color(0xFFEF8C32)
+        mov.esIngreso -> FinovaSecondary
+        else -> FinovaExpenseRed
+    }
+    val iconBg = when {
+        mov.esTransferencia -> Color(0xFFEF8C32).copy(alpha = 0.14f)
+        mov.esIngreso -> FinovaSecondaryFixed.copy(alpha = 0.5f)
+        else -> FinovaErrorContainer.copy(alpha = 0.6f)
+    }
 
     FinovaCard(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -650,10 +666,17 @@ private fun MovimientoRow(mov: MovimientoVisual, saldosOcultos: Boolean) {
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = if (saldosOcultos) "••••"
-                    else "${if (mov.esIngreso) "+" else "-"}${formatSoles(mov.monto)}",
+                    text = when {
+                        mov.esTransferencia -> formatSoles(mov.monto)
+                        mov.esIngreso -> "+${formatSoles(mov.monto)}"
+                        else -> "-${formatSoles(mov.monto)}"
+                    },
                     style = FinovaLabelLg,
-                    color = if (mov.esIngreso) FinovaIncomeGreen else FinovaExpenseRed
+                    color = when {
+                        mov.esTransferencia -> Color(0xFFEF8C32)
+                        mov.esIngreso -> FinovaIncomeGreen
+                        else -> FinovaExpenseRed
+                    }
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(

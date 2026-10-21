@@ -111,10 +111,10 @@ fun TransferirScreen(
     // --- Reaccionar al resultado de la transferencia ---
     LaunchedEffect(exitosoTransfer) {
         if (exitosoTransfer) {
-            mostrarMensaje("¡Transferiste ${formatSoles(montoDouble)}!")
             viewModel.resetearTransferencia()
             monto = ""
             concepto = ""
+            onTransferenciaExitosa()
         }
     }
 
