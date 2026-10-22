@@ -20,9 +20,11 @@ public class MovimientoResponseDTO {
 
     private Long cuentaOrigenId;
     private String cuentaOrigenNombre;
+    private String cuentaOrigenBancoNombre;
 
     private Long cuentaDestinoId;
     private String cuentaDestinoNombre;
+    private String cuentaDestinoBancoNombre;
 
     private Long metaId;
     private String metaNombre;
@@ -53,12 +55,20 @@ public class MovimientoResponseDTO {
                         ? movimiento.getCuentaOrigen().getNombre()
                         : null,
 
+                movimiento.getCuentaOrigen() != null && movimiento.getCuentaOrigen().getBanco() != null
+                        ? movimiento.getCuentaOrigen().getBanco().getNombre()
+                        : null,
+
                 movimiento.getCuentaDestino() != null
                         ? movimiento.getCuentaDestino().getId()
                         : null,
 
                 movimiento.getCuentaDestino() != null
                         ? movimiento.getCuentaDestino().getNombre()
+                        : null,
+
+                movimiento.getCuentaDestino() != null && movimiento.getCuentaDestino().getBanco() != null
+                        ? movimiento.getCuentaDestino().getBanco().getNombre()
                         : null,
 
                 movimiento.getMeta() != null

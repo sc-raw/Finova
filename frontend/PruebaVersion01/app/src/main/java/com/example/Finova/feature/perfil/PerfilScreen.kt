@@ -62,8 +62,16 @@ fun PerfilScreen(
                 PerfilItem(
                     icono = Icons.Outlined.Badge,
                     titulo = "Mis datos",
-                    subtitulo = "Información personal y seguridad",
+                    subtitulo = "Información personal",
                     onClick = { onNavigate("mis_datos") }
+                )
+                PerfilItem(
+                    icono = Icons.Outlined.Shield,
+                    titulo = "Seguridad de la cuenta",
+                    subtitulo = "Protección de tu acceso a Finova",
+                    subtituloColor = FinovaPrimary,
+                    trailingChip = "Activa",
+                    onClick = { onNavigate("seguridad_cuenta") }
                 )
             }
 

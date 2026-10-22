@@ -29,7 +29,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Finova.core.design.components.FinovaCard
 import com.example.Finova.core.design.theme.*
 import com.example.Finova.core.network.dto.CuentaDto
-import com.example.Finova.core.util.formatSoles
 
 // ============================================================
 // FINOVA — Transferir
@@ -41,6 +40,7 @@ private data class CuentaTransfer(
     val titulo: String,
     val numero: String,
     val saldo: Double,
+    val moneda: String,
     val esOrigen: Boolean
 )
 
@@ -85,6 +85,9 @@ fun TransferirScreen(
     var mostrarToast by remember { mutableStateOf(false) }
     var toastMensaje by remember { mutableStateOf("") }
     var toastEsError by remember { mutableStateOf(false) }
+    var mostrarModalTransferencia by remember { mutableStateOf(false) }
+    var modalTransferenciaEsError by remember { mutableStateOf(false) }
+    var mensajeModalTransferencia by remember { mutableStateOf("") }
 
     var dropdownOrigenAbierto by remember { mutableStateOf(false) }
     var dropdownDestinoAbierto by remember { mutableStateOf(false) }
@@ -92,6 +95,14 @@ fun TransferirScreen(
     val montoDouble = monto.toDoubleOrNull() ?: 0.0
     val excedeSaldo = origen != null && montoDouble > origen.saldo
     val saldoRestante = (origen?.saldo ?: 0.0) - montoDouble
+    // Tipo de cambio temporal alineado con el valor que ya utiliza el Dashboard.
+    val tipoCambio = 3.75
+    val monedasDiferentes = origen != null && destino != null && origen.moneda != destino.moneda
+    val montoConvertido = if (monedasDiferentes && origen != null) {
+        if (origen.moneda == "USD") montoDouble * tipoCambio else montoDouble / tipoCambio
+    } else montoDouble
+    val simboloOrigen = simboloMoneda(origen?.moneda)
+    val simboloDestino = simboloMoneda(destino?.moneda)
 
     // --- Toast helper ---
     fun mostrarMensaje(msg: String, esError: Boolean = false) {
@@ -111,21 +122,65 @@ fun TransferirScreen(
     // --- Reaccionar al resultado de la transferencia ---
     LaunchedEffect(exitosoTransfer) {
         if (exitosoTransfer) {
+            mensajeModalTransferencia = "La transferencia se realizó correctamente."
+            modalTransferenciaEsError = false
+            mostrarModalTransferencia = true
             viewModel.resetearTransferencia()
             monto = ""
             concepto = ""
-            onTransferenciaExitosa()
         }
     }
 
     LaunchedEffect(errorTransfer) {
         errorTransfer?.let {
-            mostrarMensaje(it, esError = true)
+            mensajeModalTransferencia = it
+            modalTransferenciaEsError = true
+            mostrarModalTransferencia = true
             viewModel.resetearTransferencia()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        if (mostrarModalTransferencia) {
+            AlertDialog(
+                onDismissRequest = {
+                    mostrarModalTransferencia = false
+                    if (!modalTransferenciaEsError) onTransferenciaExitosa()
+                },
+                icon = {
+                    Icon(
+                        imageVector = if (modalTransferenciaEsError) Icons.Default.ErrorOutline
+                        else Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = if (modalTransferenciaEsError) FinovaError else FinovaPrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                },
+                title = {
+                    Text(
+                        text = if (modalTransferenciaEsError) "Transferencia no realizada"
+                        else "¡Transferencia exitosa!",
+                        style = FinovaTitleMd
+                    )
+                },
+                text = {
+                    Text(mensajeModalTransferencia, style = FinovaBodyMd)
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            mostrarModalTransferencia = false
+                            if (!modalTransferenciaEsError) onTransferenciaExitosa()
+                        }
+                    ) {
+                        Text("Entendido")
+                    }
+                },
+                shape = RoundedCornerShape(24.dp),
+                containerColor = FinovaSurface
+            )
+        }
+
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
@@ -140,31 +195,6 @@ fun TransferirScreen(
                     .padding(horizontal = 16.dp)
             ) {
                 Spacer(Modifier.height(8.dp))
-
-                // ---------- Chip "Sin comisión" ----------
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(FinovaSurfaceContainer)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(FinovaSecondary)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "Sin comisión",
-                                style = FinovaLabelSm,
-                                color = FinovaOnSurfaceVariant
-                            )
-                        }
-                    }
-                }
 
                 Spacer(Modifier.height(16.dp))
 
@@ -214,6 +244,11 @@ fun TransferirScreen(
                 MontoCard(
                     monto = monto,
                     onMontoChange = { monto = it },
+                    monedaOrigen = origen?.moneda ?: "PEN",
+                    monedaDestino = destino?.moneda ?: "PEN",
+                    montoConvertido = montoConvertido,
+                    monedasDiferentes = monedasDiferentes,
+                    tipoCambio = tipoCambio,
                     excedeSaldo = excedeSaldo,
                     onChipClick = { incremento ->
                         val actual = monto.toDoubleOrNull() ?: 0.0
@@ -238,7 +273,7 @@ fun TransferirScreen(
                 Spacer(Modifier.height(16.dp))
 
                 // ---------- Card resumen ----------
-                ResumenCard(saldoRestante = saldoRestante)
+                ResumenCard(saldoRestante = saldoRestante, monedaOrigen = origen?.moneda ?: "PEN")
 
                 Spacer(Modifier.height(16.dp))
 
@@ -326,7 +361,7 @@ fun TransferirScreen(
             cuentasVisuales.forEach { c ->
                 DropdownMenuItem(
                     text = {
-                        Text("${c.titulo} - ${formatSoles(c.saldo)}")
+                        Text("${c.titulo} - ${formatearMoneda(c.saldo, c.moneda)}")
                     },
                     onClick = {
                         if (c.id != cuentaDestinoId) {
@@ -350,7 +385,7 @@ fun TransferirScreen(
                 .forEach { c ->
                     DropdownMenuItem(
                         text = {
-                            Text("${c.titulo} - ${formatSoles(c.saldo)}")
+                            Text("${c.titulo} - ${formatearMoneda(c.saldo, c.moneda)}")
                         },
                         onClick = {
                             cuentaDestinoId = c.id
@@ -410,6 +445,7 @@ private fun CuentaDto.toCuentaTransfer(): CuentaTransfer {
         titulo = nombre ?: "Cuenta",
         numero = "•••• ${numeroCuenta?.takeLast(4) ?: "----"}",
         saldo = saldoActual ?: 0.0,
+        moneda = moneda ?: "PEN",
         esOrigen = true
     )
 }
@@ -628,7 +664,7 @@ private fun CuentaRow(
                     color = FinovaOnSurfaceVariant
                 )
                 Text(
-                    text = formatSoles(cuenta.saldo),
+                    text = formatearMoneda(cuenta.saldo, cuenta.moneda),
                     style = FinovaBodySm,
                     color = FinovaOnSurface,
                     fontWeight = FontWeight.SemiBold
@@ -648,6 +684,11 @@ private fun CuentaRow(
 private fun MontoCard(
     monto: String,
     onMontoChange: (String) -> Unit,
+    monedaOrigen: String,
+    monedaDestino: String,
+    montoConvertido: Double,
+    monedasDiferentes: Boolean,
+    tipoCambio: Double,
     excedeSaldo: Boolean,
     onChipClick: (Double) -> Unit,
     onTodo: () -> Unit
@@ -670,7 +711,7 @@ private fun MontoCard(
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "Moneda: PEN (S/)",
+                    text = "Moneda: $monedaOrigen (${simboloMoneda(monedaOrigen)})",
                     style = FinovaLabelSm,
                     color = FinovaOnSurfaceVariant
                 )
@@ -688,7 +729,7 @@ private fun MontoCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "S/",
+                    text = simboloMoneda(monedaOrigen),
                     style = FinovaDisplayLgMobile,
                     color = FinovaPrimary,
                     fontWeight = FontWeight.Bold
@@ -735,10 +776,23 @@ private fun MontoCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            QuickChip("+S/ 50", Modifier.weight(1f)) { onChipClick(50.0) }
-            QuickChip("+S/ 100", Modifier.weight(1f)) { onChipClick(100.0) }
-            QuickChip("+S/ 500", Modifier.weight(1f)) { onChipClick(500.0) }
+            QuickChip("+${simboloMoneda(monedaOrigen)} 50", Modifier.weight(1f)) { onChipClick(50.0) }
+            QuickChip("+${simboloMoneda(monedaOrigen)} 100", Modifier.weight(1f)) { onChipClick(100.0) }
+            QuickChip("+${simboloMoneda(monedaOrigen)} 500", Modifier.weight(1f)) { onChipClick(500.0) }
             QuickChip("Todo", Modifier.weight(1f), destacado = true, onClick = onTodo)
+        }
+
+        if (monedasDiferentes) {
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(FinovaPrimary.copy(alpha = 0.08f)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("Monto convertido a ${if (monedaDestino == "USD") "dólares" else "soles"}", style = FinovaLabelSm, color = FinovaOnSurfaceVariant)
+                Text("${simboloMoneda(monedaDestino)} ${"%.2f".format(java.util.Locale.US, montoConvertido)}", style = FinovaHeadlineMd, color = FinovaPrimary, fontWeight = FontWeight.Bold)
+                Text("Tipo de cambio referencial: 1 USD = S/ ${"%.2f".format(java.util.Locale.US, tipoCambio)}", style = FinovaBodySm, color = FinovaOnSurfaceVariant)
+            }
         }
 
         if (excedeSaldo) {
@@ -888,8 +942,13 @@ private fun PresetChipSmall(text: String, onClick: () -> Unit) {
     }
 }
 
+private fun simboloMoneda(moneda: String?): String = if (moneda == "USD") "US$" else "S/"
+
+private fun formatearMoneda(monto: Double, moneda: String?): String =
+    "${simboloMoneda(moneda)} ${"%.2f".format(java.util.Locale.US, monto)}"
+
 @Composable
-private fun ResumenCard(saldoRestante: Double) {
+private fun ResumenCard(saldoRestante: Double, monedaOrigen: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -899,18 +958,8 @@ private fun ResumenCard(saldoRestante: Double) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ResumenRow(
-                label = "Horario de procesamiento",
-                valor = "Inmediato (24/7)"
-            )
-            ResumenRow(
-                label = "Comisión bancaria",
-                valor = "Gratis (S/ 0.00)",
-                valorColor = FinovaSecondary,
-                valorBold = true
-            )
-            ResumenRow(
                 label = "Saldo estimado tras envío",
-                valor = formatSoles(if (saldoRestante < 0) 0.0 else saldoRestante),
+                valor = formatearMoneda(if (saldoRestante < 0) 0.0 else saldoRestante, monedaOrigen),
                 valorBold = true
             )
         }

@@ -27,6 +27,7 @@ import com.example.Finova.core.design.theme.*
 import com.example.Finova.core.network.dto.CuentaDto
 import com.example.Finova.core.util.formatSoles
 import com.example.Finova.feature.movimientos.NuevaTransaccionSheet
+import java.util.Locale
 
 // ============================================================
 // FINOVA — Mis Cuentas
@@ -38,6 +39,7 @@ private data class CuentaVisual(
     val numero: String,
     val estado: String,
     val saldo: Double,
+    val moneda: String,
     val icono: ImageVector,
     val iconBg: Color,
     val iconTint: Color
@@ -50,6 +52,8 @@ fun MisCuentasScreen(
     viewModel: CuentasViewModel = viewModel()
 ) {
     var mostrarSheet by remember { mutableStateOf(false) }
+    var mostrarCrearCuenta by remember { mutableStateOf(false) }
+    var mostrarEliminarCuenta by remember { mutableStateOf(false) }
 
     val cargando by viewModel.cargando.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -150,6 +154,19 @@ fun MisCuentasScreen(
             }
 
             item {
+                OutlinedButton(
+                    onClick = { mostrarEliminarCuenta = true },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(46.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Eliminar cuenta")
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            item {
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -158,7 +175,7 @@ fun MisCuentasScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
-                        onClick = { },
+                        onClick = { mostrarCrearCuenta = true },
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),
@@ -212,6 +229,28 @@ fun MisCuentasScreen(
         }
     }
 
+    if (mostrarCrearCuenta) {
+        CrearCuentaDialog(
+            cuentasActuales = cuentasDto,
+            onDismiss = { mostrarCrearCuenta = false },
+            onComplete = {
+                mostrarCrearCuenta = false
+                viewModel.cargarCuentas()
+            }
+        )
+    }
+
+    if (mostrarEliminarCuenta) {
+        EliminarCuentaDialog(
+            cuentas = cuentasDto,
+            onDismiss = { mostrarEliminarCuenta = false },
+            onComplete = {
+                mostrarEliminarCuenta = false
+                viewModel.cargarCuentas()
+            }
+        )
+    }
+
     // ---------- Bottom Sheet ----------
     if (mostrarSheet) {
         NuevaTransaccionSheet(
@@ -260,6 +299,7 @@ private fun CuentaDto.toVisual(): CuentaVisual {
         numero = "•••• ${numeroCuenta?.takeLast(4) ?: "----"}",
         estado = if (esUsd) "USD" else "Soles",
         saldo = saldoActual ?: 0.0,
+        moneda = moneda ?: "PEN",
         icono = icono,
         iconBg = iconBg,
         iconTint = iconTint
@@ -415,7 +455,7 @@ private fun CuentaCard(cuenta: CuentaVisual) {
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = formatSoles(cuenta.saldo),
+                text = if (cuenta.moneda == "USD") "US$ ${String.format(Locale.US, "%.2f", cuenta.saldo)}" else formatSoles(cuenta.saldo),
                 style = FinovaHeadlineMd,
                 color = FinovaOnSurface
             )

@@ -6,6 +6,9 @@ import com.finova.entity.Usuario;
 import com.finova.exception.RecursoNoEncontradoException;
 import com.finova.exception.ReglaNegocioException;
 import com.finova.repository.CuentaRepository;
+import com.finova.repository.MovimientoRepository;
+import com.finova.entity.Movimiento;
+import com.finova.service.MovimientoService;
 import com.finova.repository.UsuarioRepository;
 import com.finova.service.CuentaService;
 import com.finova.entity.Banco;
@@ -25,6 +28,8 @@ public class CuentaServiceImp implements CuentaService {
     private final CuentaRepository cuentaRepository;
     private final UsuarioRepository usuarioRepository;
     private final BancoRepository bancoRepository;
+    private final MovimientoRepository movimientoRepository;
+    private final MovimientoService movimientoService;
 
     @Override
     @Transactional(readOnly = true)
@@ -187,6 +192,106 @@ public class CuentaServiceImp implements CuentaService {
         }
 
         cuentaRepository.delete(cuenta);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarSinSaldo(Long id) {
+        validarId(id, "cuenta");
+        Cuenta cuenta = buscarPorId(id);
+        Long usuarioId = cuenta.getUsuario().getId();
+        List<Cuenta> cuentasUsuario = cuentaRepository.findByUsuarioId(usuarioId);
+        if (cuentasUsuario.size() <= 1) {
+            throw new ReglaNegocioException("No puedes eliminar la única cuenta registrada");
+        }
+        Long principalId = cuentasUsuario.stream().map(Cuenta::getId).min(Long::compareTo).orElse(null);
+        if (id.equals(principalId)) {
+            throw new ReglaNegocioException("No puedes eliminar la cuenta principal");
+        }
+        BigDecimal saldo = cuenta.getSaldoActual();
+        if (saldo == null || saldo.compareTo(BigDecimal.ZERO) != 0) {
+            throw new ReglaNegocioException("Solo puedes eliminar una cuenta cuando su saldo sea exactamente cero");
+        }
+
+        List<Movimiento> movimientos = movimientoRepository.findAll().stream()
+                .filter(m -> (m.getCuentaOrigen() != null && id.equals(m.getCuentaOrigen().getId()))
+                        || (m.getCuentaDestino() != null && id.equals(m.getCuentaDestino().getId())))
+                .toList();
+        for (Movimiento movimiento : movimientos) {
+            String nota = "Cuenta eliminada: " + cuenta.getNombre();
+            if (movimiento.getDescripcion() == null || !movimiento.getDescripcion().contains(nota)) {
+                movimiento.setDescripcion((movimiento.getDescripcion() == null || movimiento.getDescripcion().isBlank())
+                        ? nota : movimiento.getDescripcion() + " | " + nota);
+            }
+            if (movimiento.getCuentaOrigen() != null && id.equals(movimiento.getCuentaOrigen().getId())) {
+                movimiento.setCuentaOrigen(null);
+            }
+            if (movimiento.getCuentaDestino() != null && id.equals(movimiento.getCuentaDestino().getId())) {
+                movimiento.setCuentaDestino(null);
+            }
+        }
+        movimientoRepository.saveAll(movimientos);
+        cuentaRepository.delete(cuenta);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarConTransferencia(Long id, Long cuentaDestinoId) {
+        validarId(id, "cuenta");
+        validarId(cuentaDestinoId, "cuenta destino");
+        if (id.equals(cuentaDestinoId)) {
+            throw new ReglaNegocioException("La cuenta de destino debe ser diferente");
+        }
+
+        Cuenta origen = buscarPorId(id);
+        Cuenta destino = buscarPorId(cuentaDestinoId);
+        Long usuarioId = origen.getUsuario().getId();
+        if (!destino.getUsuario().getId().equals(usuarioId)) {
+            throw new ReglaNegocioException("La cuenta de destino debe pertenecer al mismo usuario");
+        }
+        if (origen.getMoneda() != destino.getMoneda()) {
+            throw new ReglaNegocioException("La cuenta de destino debe usar la misma moneda");
+        }
+
+        List<Cuenta> cuentasUsuario = cuentaRepository.findByUsuarioId(usuarioId);
+        if (cuentasUsuario.size() <= 1) {
+            throw new ReglaNegocioException("No puedes eliminar la única cuenta registrada");
+        }
+        Long principalId = cuentasUsuario.stream().map(Cuenta::getId).min(Long::compareTo).orElse(null);
+        if (id.equals(principalId)) {
+            throw new ReglaNegocioException("No puedes eliminar la cuenta principal");
+        }
+
+        BigDecimal saldo = origen.getSaldoActual() == null ? BigDecimal.ZERO : origen.getSaldoActual();
+        if (saldo.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ReglaNegocioException("El saldo de la cuenta no es válido");
+        }
+        if (saldo.compareTo(BigDecimal.ZERO) > 0) {
+            movimientoService.transferir(id, cuentaDestinoId, saldo,
+                    "Transferencia por eliminación de cuenta: " + origen.getNombre());
+        }
+
+        // Conserva el historial de movimientos, pero elimina las referencias FK
+        // a la cuenta que dejará de existir. El texto conserva el nombre de la cuenta.
+        List<Movimiento> movimientos = movimientoRepository.findAll().stream()
+                .filter(m -> (m.getCuentaOrigen() != null && id.equals(m.getCuentaOrigen().getId()))
+                        || (m.getCuentaDestino() != null && id.equals(m.getCuentaDestino().getId())))
+                .toList();
+        for (Movimiento movimiento : movimientos) {
+            String nota = "Cuenta eliminada: " + origen.getNombre();
+            if (movimiento.getDescripcion() == null || !movimiento.getDescripcion().contains(nota)) {
+                movimiento.setDescripcion((movimiento.getDescripcion() == null || movimiento.getDescripcion().isBlank())
+                        ? nota : movimiento.getDescripcion() + " | " + nota);
+            }
+            if (movimiento.getCuentaOrigen() != null && id.equals(movimiento.getCuentaOrigen().getId())) {
+                movimiento.setCuentaOrigen(null);
+            }
+            if (movimiento.getCuentaDestino() != null && id.equals(movimiento.getCuentaDestino().getId())) {
+                movimiento.setCuentaDestino(null);
+            }
+        }
+        movimientoRepository.saveAll(movimientos);
+        cuentaRepository.delete(origen);
     }
 
     @Override

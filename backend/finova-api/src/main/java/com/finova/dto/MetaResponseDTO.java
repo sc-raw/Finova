@@ -1,6 +1,7 @@
 package com.finova.dto;
 
 import com.finova.entity.Meta;
+import com.finova.entity.Moneda;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,6 +22,8 @@ public class MetaResponseDTO {
 
     private String nombre;
 
+    private Moneda moneda;
+
     private BigDecimal montoObjetivo;
     private BigDecimal montoActual;
 
@@ -34,6 +37,7 @@ public class MetaResponseDTO {
                         ? meta.getUsuario().getId()
                         : null,
                 meta.getNombre(),
+                meta.getMoneda(),
                 meta.getMontoObjetivo(),
                 meta.getMontoActual(),
                 meta.getFechaObjetivo()

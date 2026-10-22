@@ -88,6 +88,23 @@ public class CuentaController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/sin-saldo")
+    public ResponseEntity<Void> eliminarSinSaldo(@PathVariable Long id) {
+        cuentaService.eliminarSinSaldo(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/eliminar-con-transferencia")
+    public ResponseEntity<Void> eliminarConTransferencia(
+            @PathVariable Long id,
+            @RequestBody Map<String, Long> body) {
+        if (body == null || body.get("cuentaDestinoId") == null) {
+            throw new IllegalArgumentException("El campo 'cuentaDestinoId' es obligatorio");
+        }
+        cuentaService.eliminarConTransferencia(id, body.get("cuentaDestinoId"));
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}/sumar")
     public ResponseEntity<Void> sumarSaldo(
             @PathVariable Long id,

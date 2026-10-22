@@ -7,6 +7,7 @@ data class RegistrarGastoRequestDto(
     @SerializedName("categoriaId") val categoriaId: Long,
     @SerializedName("metodoPagoId") val metodoPagoId: Long,
     @SerializedName("monto") val monto: Double,
+    @SerializedName("moneda") val moneda: String,
     @SerializedName("titulo") val titulo: String?,
     @SerializedName("descripcion") val descripcion: String?
 )

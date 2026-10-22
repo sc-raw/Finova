@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 import com.finova.dto.LoginResponseDTO;
 import com.finova.security.JwtService;
 
@@ -62,7 +64,9 @@ public class UsuarioController {
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> actualizar(
             @PathVariable Long id,
-            @RequestBody Usuario usuario) {
+            @RequestBody Usuario usuario,
+            Authentication authentication) {
+        validarPropietario(id, authentication);
         return ResponseEntity.ok(
                 UsuarioResponseDTO.desdeEntidad(
                         usuarioService.actualizar(id, usuario)
@@ -100,7 +104,9 @@ public class UsuarioController {
     @PutMapping("/{id}/password")
     public ResponseEntity<Void> cambiarPassword(
             @PathVariable Long id,
-            @RequestBody CambiarPasswordRequestDTO request) {
+            @RequestBody CambiarPasswordRequestDTO request,
+            Authentication authentication) {
+        validarPropietario(id, authentication);
         usuarioService.cambiarPassword(
                 id,
                 request.getPasswordActual(),
@@ -108,5 +114,15 @@ public class UsuarioController {
         );
 
         return ResponseEntity.noContent().build();
+    }
+
+    private void validarPropietario(Long id, Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sesión no válida");
+        }
+        Usuario usuario = usuarioService.buscarPorId(id);
+        if (!usuario.getCorreo().equalsIgnoreCase(authentication.getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes modificar otra cuenta");
+        }
     }
 }

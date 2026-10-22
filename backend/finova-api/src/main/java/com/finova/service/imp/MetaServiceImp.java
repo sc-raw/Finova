@@ -2,10 +2,13 @@
 package com.finova.service.imp;
 
 import com.finova.entity.Meta;
+import com.finova.entity.Moneda;
 import com.finova.entity.Usuario;
 import com.finova.exception.RecursoNoEncontradoException;
 import com.finova.exception.ReglaNegocioException;
 import com.finova.repository.MetaRepository;
+import com.finova.repository.CuentaRepository;
+import com.finova.repository.MovimientoRepository;
 import com.finova.repository.UsuarioRepository;
 import com.finova.service.MetaService;
 import com.finova.entity.Cuenta;
@@ -34,6 +37,8 @@ public class MetaServiceImp implements MetaService {
     private final MetaRepository metaRepository;
     private final UsuarioRepository usuarioRepository;
     private final MovimientoService movimientoService;
+    private final CuentaRepository cuentaRepository;
+    private final MovimientoRepository movimientoRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -93,6 +98,7 @@ public class MetaServiceImp implements MetaService {
         }
 
         meta.setNombre(meta.getNombre().trim());
+        if (meta.getMoneda() == null) meta.setMoneda(Moneda.PEN);
         meta.setMontoActual(montoActual);
         meta.setUsuario(usuario);
 
@@ -135,6 +141,7 @@ public class MetaServiceImp implements MetaService {
         }
 
         existente.setNombre(metaActualizada.getNombre().trim());
+        // La moneda de una meta se define al crearla y no cambia al editarla.
         existente.setMontoObjetivo(objetivo);
         existente.setFechaObjetivo(metaActualizada.getFechaObjetivo());
 
@@ -144,6 +151,58 @@ public class MetaServiceImp implements MetaService {
     @Override
     public void eliminar(Long id) {
         Meta meta = buscarPorId(id);
+        metaRepository.delete(meta);
+    }
+
+    /**
+     * Devuelve el saldo de la meta a una cuenta del mismo usuario,
+     * registra la devolución como movimiento y elimina la meta dentro
+     * de una única transacción.
+     */
+    @Override
+    @Transactional
+    public void eliminarConDevolucion(Long id, Long cuentaDestinoId) {
+        if (cuentaDestinoId == null) {
+            throw new ReglaNegocioException("Debes seleccionar una cuenta de destino");
+        }
+
+        Meta meta = buscarPorId(id);
+        Cuenta cuentaDestino = cuentaRepository.findById(cuentaDestinoId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Cuenta de destino no encontrada"));
+
+        if (meta.getUsuario() == null || cuentaDestino.getUsuario() == null
+                || !meta.getUsuario().getId().equals(cuentaDestino.getUsuario().getId())) {
+            throw new ReglaNegocioException("La cuenta seleccionada no pertenece al usuario de esta meta");
+        }
+        if (cuentaDestino.getMoneda() != meta.getMoneda()) {
+            throw new ReglaNegocioException("La cuenta de devolución debe tener la misma moneda que la meta (" + meta.getMoneda() + ")");
+        }
+
+        BigDecimal saldoMeta = meta.getMontoActual() == null ? BigDecimal.ZERO : meta.getMontoActual();
+        String nombreMeta = meta.getNombre();
+
+        if (saldoMeta.compareTo(BigDecimal.ZERO) > 0) {
+            Movimiento devolucion = new Movimiento();
+            devolucion.setCuentaDestino(cuentaDestino);
+            devolucion.setMeta(meta);
+            devolucion.setMonto(saldoMeta);
+            devolucion.setTitulo("Devolución de meta eliminada");
+            devolucion.setDescripcion("Devolución del ahorro de la meta: " + nombreMeta);
+            devolucion.setTipoMovimiento(TipoMovimiento.RETIRO_META);
+            devolucion.setFechaMovimiento(LocalDateTime.now());
+            movimientoService.guardar(devolucion);
+        }
+
+        // La base de datos puede impedir borrar una meta referenciada por movimientos.
+        // Conservamos los movimientos históricos, pero los desvinculamos de la meta eliminada.
+        List<Movimiento> movimientosMeta = movimientoRepository.findByMetaId(id);
+        for (Movimiento movimiento : movimientosMeta) {
+            movimiento.setMeta(null);
+            if (movimiento.getDescripcion() == null || movimiento.getDescripcion().isBlank()) {
+                movimiento.setDescripcion("Movimiento de la meta eliminada: " + nombreMeta);
+            }
+        }
+        movimientoRepository.saveAll(movimientosMeta);
         metaRepository.delete(meta);
     }
 
@@ -188,15 +247,26 @@ public class MetaServiceImp implements MetaService {
                         )
                 );
 
+        Cuenta cuentaDestino = cuentaRepository.findById(cuentaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Cuenta de destino no encontrada"));
+
+        if (cuentaDestino.getMoneda() != meta.getMoneda()) {
+            throw new ReglaNegocioException(
+                    "La cuenta de destino debe tener la misma moneda que la meta (" + meta.getMoneda() + ")"
+            );
+        }
+
+        if (meta.getUsuario() == null || cuentaDestino.getUsuario() == null
+                || !meta.getUsuario().getId().equals(cuentaDestino.getUsuario().getId())) {
+            throw new ReglaNegocioException("La cuenta de destino no pertenece al usuario de esta meta");
+        }
+
         if (meta.getMontoActual() == null
                 || meta.getMontoActual().compareTo(monto) < 0) {
             throw new ReglaNegocioException(
                     "La meta no tiene saldo suficiente"
             );
         }
-
-        Cuenta cuentaDestino = new Cuenta();
-        cuentaDestino.setId(cuentaId);
 
         Movimiento movimiento = new Movimiento();
         movimiento.setCuentaDestino(cuentaDestino);

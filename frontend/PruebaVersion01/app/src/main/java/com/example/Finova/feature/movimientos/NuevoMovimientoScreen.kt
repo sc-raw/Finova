@@ -2,9 +2,24 @@
 package com.example.Finova.feature.movimientos
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.example.Finova.core.design.theme.FinovaPrimary
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,6 +35,7 @@ import com.example.Finova.core.network.ApiClient
 import com.example.Finova.core.network.dto.*
 import com.example.Finova.core.util.SessionManager
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +49,7 @@ fun NuevoMovimientoScreen(
     val usuarioId = remember { session.obtenerUsuarioId() }
 
     var tipo by remember { mutableStateOf("GASTO") }
+    var moneda by remember { mutableStateOf("PEN") }
     var monto by remember { mutableStateOf("") }
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
@@ -55,12 +72,20 @@ fun NuevoMovimientoScreen(
 
 
 
+    val cuentasMoneda = cuentas.filter { it.moneda.equals(moneda, ignoreCase = true) }
+
+    LaunchedEffect(moneda, cuentas) {
+        if (cuentaSeleccionada?.moneda?.equals(moneda, ignoreCase = true) != true) {
+            cuentaSeleccionada = cuentasMoneda.firstOrNull()
+        }
+    }
+
     LaunchedEffect(usuarioId) {
         try {
             cuentas = ApiClient.apiService.listarCuentasPorUsuario(usuarioId)
             categorias = ApiClient.apiService.listarCategorias()
             metodos = ApiClient.apiService.listarMetodosPagoActivos()
-            cuentaSeleccionada = cuentas.firstOrNull()
+            cuentaSeleccionada = cuentas.firstOrNull { it.moneda.equals(moneda, ignoreCase = true) }
             categoriaSeleccionada = categorias.firstOrNull {
                 it.tipo.equals(tipo, ignoreCase = true)
             }
@@ -79,38 +104,103 @@ fun NuevoMovimientoScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Agregar movimiento") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Volver") }
-                }
-            )
-        }
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = FinovaPrimary)
+                }
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = FinovaPrimary
+                ) {
+                    Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Text("F", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    Text("FINOVA", color = FinovaPrimary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("Movimientos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+            }
+            Text(
+                text = "Selecciona el tipo de movimiento",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium
+            )
             if (cargando) {
                 CircularProgressIndicator()
                 return@Column
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
                 FilterChip(
+                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp).heightIn(min = 64.dp),
                     selected = tipo == "GASTO",
                     onClick = { tipo = "GASTO" },
-                    label = { Text("Gasto") }
+                    label = { Text("Gasto", fontWeight = FontWeight.Medium) },
+                    leadingIcon = {
+                        Icon(Icons.Filled.TrendingDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color(0xFFFFF5F4),
+                        labelColor = Color(0xFF424242),
+                        iconColor = Color(0xFFC62828),
+                        selectedContainerColor = Color(0xFFFFE1DE),
+                        selectedLabelColor = Color(0xFFC62828),
+                        selectedLeadingIconColor = Color(0xFFC62828)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = tipo == "GASTO",
+                        borderColor = Color(0xFFE0E0E0),
+                        selectedBorderColor = Color(0xFFE53935)
+                    )
                 )
+                Spacer(Modifier.width(10.dp))
                 FilterChip(
+                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp).heightIn(min = 64.dp),
                     selected = tipo == "INGRESO",
                     onClick = { tipo = "INGRESO" },
-                    label = { Text("Ingreso") }
+                    label = { Text("Ingreso", fontWeight = FontWeight.Medium) },
+                    leadingIcon = {
+                        Icon(Icons.Filled.TrendingUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color(0xFFF1FAF7),
+                        labelColor = Color(0xFF424242),
+                        iconColor = FinovaPrimary,
+                        selectedContainerColor = Color(0xFFDDF5EF),
+                        selectedLabelColor = FinovaPrimary,
+                        selectedLeadingIconColor = FinovaPrimary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = tipo == "INGRESO",
+                        borderColor = Color(0xFFE0E0E0),
+                        selectedBorderColor = Color(0xFF9DE4D2)
+                    )
                 )
             }
 
@@ -121,16 +211,50 @@ fun NuevoMovimientoScreen(
                         monto = valor
                     }
                 },
-                label = { Text("Monto (S/)") },
+                label = { Text(if (moneda == "PEN") "Monto (S/)" else "Monto ($)") },
+                leadingIcon = { Text(if (moneda == "PEN") "S/" else "$", color = FinovaPrimary, fontWeight = FontWeight.Bold) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp).heightIn(min = 60.dp),
+                    selected = moneda == "PEN",
+                    onClick = { moneda = "PEN"; monto = ""; error = null },
+                    label = { Text("Soles (S/)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge) },
+                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFDDF5EF),
+                        selectedLabelColor = FinovaPrimary,
+                        selectedLeadingIconColor = FinovaPrimary
+                    )
+                )
+                Spacer(Modifier.width(10.dp))
+                FilterChip(
+                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp).heightIn(min = 60.dp),
+                    selected = moneda == "USD",
+                    onClick = { moneda = "USD"; monto = ""; error = null },
+                    label = { Text("Dólares ($)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge) },
+                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFDDF5EF),
+                        selectedLabelColor = FinovaPrimary,
+                        selectedLeadingIconColor = FinovaPrimary
+                    )
+                )
+            }
+
             OutlinedTextField(
                 value = titulo,
                 onValueChange = { titulo = it },
                 label = { Text("Título") },
+                leadingIcon = { Icon(Icons.Filled.Description, contentDescription = null, tint = FinovaPrimary) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -140,10 +264,13 @@ fun NuevoMovimientoScreen(
                 onExpandedChange = { menuCuenta = !menuCuenta }
             ) {
                 OutlinedTextField(
-                    value = cuentaSeleccionada?.nombre ?: "Seleccionar cuenta",
+                    value = cuentaSeleccionada?.let { cuenta ->
+                        "${cuenta.nombre} — ${if (moneda == "PEN") "S/" else "$"} ${String.format(Locale.US, "%.2f", cuenta.saldoActual ?: 0.0)}"
+                    } ?: "Seleccionar cuenta",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Cuenta") },
+                    leadingIcon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null, tint = FinovaPrimary) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuCuenta) },
                     modifier = Modifier.menuAnchor().fillMaxWidth()
                 )
@@ -151,10 +278,10 @@ fun NuevoMovimientoScreen(
                     expanded = menuCuenta,
                     onDismissRequest = { menuCuenta = false }
                 ) {
-                    cuentas.forEach { cuenta ->
+                    cuentasMoneda.forEach { cuenta ->
                         DropdownMenuItem(
                             text = {
-                                Text("${cuenta.nombre} — S/ ${cuenta.saldoActual ?: 0.0}")
+                                Text("${cuenta.nombre} — ${if (moneda == "PEN") "S/" else "$"} ${String.format(Locale.US, "%.2f", cuenta.saldoActual ?: 0.0)}")
                             },
                             onClick = {
                                 cuentaSeleccionada = cuenta
@@ -163,6 +290,14 @@ fun NuevoMovimientoScreen(
                         )
                     }
                 }
+            }
+
+            if (cuentasMoneda.isEmpty()) {
+                Text(
+                    text = "No dispones de una cuenta en ${if (moneda == "PEN") "soles" else "dólares"}.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
 
             ExposedDropdownMenuBox(
@@ -174,6 +309,7 @@ fun NuevoMovimientoScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Categoría") },
+                    leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null, tint = FinovaPrimary) },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(menuCategoria)
                     },
@@ -206,6 +342,7 @@ fun NuevoMovimientoScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Método de pago") },
+                    leadingIcon = { Icon(Icons.Filled.CreditCard, contentDescription = null, tint = FinovaPrimary) },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(menuMetodo)
                     },
@@ -246,7 +383,7 @@ fun NuevoMovimientoScreen(
                     val categoria = categoriaSeleccionada
                     val metodo = metodoSeleccionado
                     if (cuenta == null || categoria == null || metodo == null) {
-                        error = "Selecciona cuenta, categoría y método de pago."
+                        error = if (cuenta == null) "Selecciona una cuenta en ${if (moneda == "PEN") "soles" else "dólares"}." else "Selecciona categoría y método de pago."
                         return@Button
                     }
 
@@ -261,6 +398,7 @@ fun NuevoMovimientoScreen(
                                         categoriaId = categoria.id,
                                         metodoPagoId = metodo.id,
                                         monto = valor,
+                                        moneda = moneda,
                                         titulo = titulo.trim().ifBlank { null },
                                         descripcion = descripcion.trim().ifBlank { null }
                                     )
@@ -272,6 +410,7 @@ fun NuevoMovimientoScreen(
                                         categoriaId = categoria.id,
                                         metodoPagoId = metodo.id,
                                         monto = valor,
+                                        moneda = moneda,
                                         titulo = titulo.trim().ifBlank { null },
                                         descripcion = descripcion.trim().ifBlank { null }
                                     )
@@ -293,7 +432,7 @@ fun NuevoMovimientoScreen(
                     }
                 },
                 enabled = !guardando &&
-                        cuentas.isNotEmpty() &&
+                        cuentasMoneda.isNotEmpty() &&
                         categorias.any { it.tipo.equals(tipo, ignoreCase = true) } &&
                         metodos.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth()
@@ -306,7 +445,9 @@ fun NuevoMovimientoScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Guardando...")
                 } else {
-                    Text("Guardar movimiento")
+                    Icon(Icons.Filled.Save, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Guardar movimiento", fontWeight = FontWeight.SemiBold)
                 }
             }
         }

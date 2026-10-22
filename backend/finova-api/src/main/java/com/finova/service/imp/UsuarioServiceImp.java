@@ -97,27 +97,6 @@ public class UsuarioServiceImp implements UsuarioService {
             );
         }
 
-        String correo = usuarioActualizado.getCorreo();
-
-        if (correo == null || correo.isBlank()
-                || !correo.trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
-            throw new ReglaNegocioException(
-                    "El correo electrónico no es válido"
-            );
-        }
-
-        correo = correo.trim().toLowerCase();
-
-        if (!existente.getCorreo().equalsIgnoreCase(correo)) {
-            if (usuarioRepository.existsByCorreo(correo)) {
-                throw new ReglaNegocioException(
-                        "El correo ya está en uso por otro usuario"
-                );
-            }
-
-            existente.setCorreo(correo);
-        }
-
         existente.setNombres(usuarioActualizado.getNombres().trim());
         existente.setApellidos(usuarioActualizado.getApellidos().trim());
         existente.setFoto(usuarioActualizado.getFoto());

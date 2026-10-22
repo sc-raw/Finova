@@ -99,6 +99,19 @@ public class MetaController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/eliminar-con-devolucion")
+    public ResponseEntity<Void> eliminarConDevolucion(
+            @PathVariable Long id,
+            @RequestBody Map<String, Long> body) {
+
+        if (body == null || body.get("cuentaDestinoId") == null) {
+            throw new ReglaNegocioException("La cuenta de destino es obligatoria");
+        }
+
+        metaService.eliminarConDevolucion(id, body.get("cuentaDestinoId"));
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}/aportar")
     public ResponseEntity<Void> aportar(
             @PathVariable Long id,

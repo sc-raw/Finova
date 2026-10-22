@@ -5,6 +5,18 @@ import okhttp3.MultipartBody
 import retrofit2.http.*
 import retrofit2.http.PATCH
 
+data class MetaUsuarioRequestDto(
+    val id: Long
+)
+
+data class MetaRequestDto(
+    val usuario: MetaUsuarioRequestDto,
+    val nombre: String,
+    val montoObjetivo: Double,
+    val montoActual: Double,
+    val moneda: String = "PEN"
+)
+
 interface ApiService {
 
     // ==========================================================
@@ -133,7 +145,7 @@ interface ApiService {
     suspend fun obtenerCuenta(@Path("id") id: Long): CuentaDto
 
     @POST("api/cuentas")
-    suspend fun guardarCuenta(@Body cuenta: CuentaDto): CuentaDto
+    suspend fun guardarCuenta(@Body cuenta: CuentaRequestDto): CuentaDto
 
     @PUT("api/cuentas/{id}")
     suspend fun actualizarCuenta(
@@ -231,16 +243,22 @@ interface ApiService {
     suspend fun calcularProgresoMeta(@Path("id") id: Long): Double
 
     @POST("api/metas")
-    suspend fun guardarMeta(@Body meta: MetaDto): MetaDto
+    suspend fun guardarMeta(@Body meta: MetaRequestDto): MetaDto
 
     @PUT("api/metas/{id}")
     suspend fun actualizarMeta(
         @Path("id") id: Long,
-        @Body meta: MetaDto
+        @Body meta: MetaRequestDto
     ): MetaDto
 
     @DELETE("api/metas/{id}")
     suspend fun eliminarMeta(@Path("id") id: Long)
+
+    @POST("api/metas/{id}/eliminar-con-devolucion")
+    suspend fun eliminarMetaConDevolucion(
+        @Path("id") id: Long,
+        @Body body: Map<String, Long>
+    )
 
     @PUT("api/metas/{id}/aportar")
     suspend fun aportarAMeta(

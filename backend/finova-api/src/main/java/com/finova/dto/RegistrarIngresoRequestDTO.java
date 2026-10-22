@@ -14,6 +14,7 @@ public class RegistrarIngresoRequestDTO {
     private Long categoriaId;
     private Long metodoPagoId;
     private BigDecimal monto;
+    private String moneda;
     private String titulo;
     private String descripcion;
 }

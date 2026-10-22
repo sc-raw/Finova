@@ -23,4 +23,6 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long> {
             TipoMovimiento tipo,
             Long usuarioId
     );
+
+    List<Movimiento> findByMetaId(Long metaId);
 }

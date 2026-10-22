@@ -19,6 +19,8 @@ public interface MetaService {
 
     void eliminar(Long id);
 
+    void eliminarConDevolucion(Long id, Long cuentaDestinoId);
+
     void aportar(Long metaId, BigDecimal monto);
 
     void retirar(Long metaId, Long cuentaId, BigDecimal monto);

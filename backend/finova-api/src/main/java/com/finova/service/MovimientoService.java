@@ -25,6 +25,7 @@ public interface MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String moneda,
             String titulo,
             String descripcion
     );
@@ -34,6 +35,7 @@ public interface MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String moneda,
             String titulo,
             String descripcion
     );

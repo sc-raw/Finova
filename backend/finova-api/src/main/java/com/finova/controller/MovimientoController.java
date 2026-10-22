@@ -108,7 +108,8 @@ public class MovimientoController {
     	        request.getCategoriaId(),
     	        request.getMetodoPagoId(),
     	        request.getMonto(),
-    	        request.getTitulo(),
+    	        request.getMoneda(),
+		        request.getTitulo(),
     	        request.getDescripcion()
     	);
         return ResponseEntity.status(HttpStatus.CREATED).build();
@@ -122,7 +123,8 @@ public class MovimientoController {
     	        request.getCategoriaId(),
     	        request.getMetodoPagoId(),
     	        request.getMonto(),
-    	        request.getTitulo(),
+    	        request.getMoneda(),
+		        request.getTitulo(),
     	        request.getDescripcion()
     	);
         return ResponseEntity.status(HttpStatus.CREATED).build();

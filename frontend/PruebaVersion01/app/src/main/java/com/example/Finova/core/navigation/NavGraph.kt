@@ -41,6 +41,7 @@ import com.example.Finova.feature.estadisticas.AnadirFondosScreen
 // Perfil
 import com.example.Finova.feature.perfil.PerfilScreen
 import com.example.Finova.feature.perfil.MisDatosScreen
+import com.example.Finova.feature.perfil.CambiarPasswordScreen
 
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
@@ -207,9 +208,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Screen.MisDatos.route) {
             MisDatosScreen(
-                onBack = {
-                    navController.popBackStack()
-                }
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.SeguridadCuenta.route) {
+            CambiarPasswordScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -290,8 +295,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         composable(Screen.Metas.route) {
             MetasScreen(
                 onNavigate = goTo,
-                onAnadirFondos = {
-                    goTo(Screen.AnadirFondos.route)
+                onAnadirFondos = { metaId ->
+                    goTo(Screen.AnadirFondos.createRoute(metaId))
                 },
                 onBack = {
                     navController.popBackStack()
@@ -304,14 +309,18 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        composable(Screen.AnadirFondos.route) {
+
+        composable(
+            route = Screen.AnadirFondos.route,
+            arguments = listOf(
+                navArgument("metaId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val metaId = backStackEntry.arguments?.getLong("metaId") ?: return@composable
             AnadirFondosScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
-                onConfirmar = {
-                    goTo(Screen.Metas.route)
-                }
+                metaId = metaId,
+                onBack = { navController.popBackStack() },
+                onConfirmar = { goTo(Screen.Metas.route) }
             )
         }
     }

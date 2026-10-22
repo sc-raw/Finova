@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.Finova.core.network.dto.UsuarioDto
+import com.example.Finova.core.network.dto.CambiarPasswordRequestDto
 import com.example.Finova.core.util.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,9 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _exitoActualizacion = MutableStateFlow(false)
     val exitoActualizacion: StateFlow<Boolean> = _exitoActualizacion
+
+    private val _exitoPassword = MutableStateFlow(false)
+    val exitoPassword: StateFlow<Boolean> = _exitoPassword
 
     fun cargarPerfil() {
         viewModelScope.launch {
@@ -66,7 +70,8 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
                     id = usuarioId,
                     nombres = nombres.trim(),
                     apellidos = apellidos.trim(),
-                    correo = correo.trim(),
+                    // El correo se conserva: no es editable desde Mis datos.
+                    correo = usuarioActual?.correo ?: correo,
                     foto = usuarioActual?.foto,
                     fechaCreacion = usuarioActual?.fechaCreacion
                 )
@@ -78,7 +83,7 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
                     usuarioId = usuarioId,
                     nombres = nombres.trim(),
                     apellidos = apellidos.trim(),
-                    correo = correo.trim(),
+                    correo = usuarioActualizado.correo.orEmpty(),
                     token = sessionManager.obtenerToken()
                 )
 
@@ -96,5 +101,53 @@ class PerfilViewModel(application: Application) : AndroidViewModel(application) 
     fun resetearEstados() {
         _error.value = null
         _exitoActualizacion.value = false
+    }
+
+    fun cambiarPassword(passwordActual: String, passwordNueva: String) {
+        viewModelScope.launch {
+            _cargando.value = true
+            _error.value = null
+            _exitoPassword.value = false
+            try {
+                val usuarioId = sessionManager.obtenerUsuarioId()
+                if (usuarioId == -1L) {
+                    _error.value = "No se encontró la sesión. Inicia sesión nuevamente."
+                    return@launch
+                }
+                if (passwordActual.isBlank()) {
+                    _error.value = "Ingresa tu contraseña actual."
+                    return@launch
+                }
+                if (passwordNueva.length < 8) {
+                    _error.value = "La nueva contraseña debe tener al menos 8 caracteres."
+                    return@launch
+                }
+                if (passwordActual == passwordNueva) {
+                    _error.value = "La nueva contraseña debe ser diferente de la actual."
+                    return@launch
+                }
+                repository.cambiarPassword(
+                    usuarioId,
+                    CambiarPasswordRequestDto(
+                        passwordActual = passwordActual,
+                        passwordNueva = passwordNueva
+                    )
+                )
+                _exitoPassword.value = true
+            } catch (e: Exception) {
+                _error.value = when {
+                    e.message?.contains("401") == true || e.message?.contains("403") == true -> "No autorizado. Inicia sesión nuevamente."
+                    e.message?.contains("400") == true -> "La contraseña actual es incorrecta o los datos no son válidos."
+                    else -> "No se pudo cambiar la contraseña. Verifica los datos e inténtalo nuevamente."
+                }
+            } finally {
+                _cargando.value = false
+            }
+        }
+    }
+
+    fun resetearEstadoPassword() {
+        _error.value = null
+        _exitoPassword.value = false
     }
 }

@@ -22,9 +22,16 @@ sealed class Screen(val route: String) {
 
     object Estadisticas : Screen("estadisticas")
     object Metas : Screen("metas")
-    object AnadirFondos : Screen("anadir_fondos")
+
+
+    object AnadirFondos : Screen("anadir_fondos/{metaId}") {
+        fun createRoute(metaId: Long) = "anadir_fondos/$metaId"
+    }
+
+
     object Perfil : Screen("perfil")
     object MisDatos : Screen("mis_datos")
+    object SeguridadCuenta : Screen("seguridad_cuenta")
     object Escanear : Screen("escanear")
     object ComprobanteRevision : Screen("comprobante_revision")
 
@@ -32,7 +39,7 @@ sealed class Screen(val route: String) {
         val values = listOf(
             Splash, Login, Registro, Dashboard, MisCuentas, Transferir,
             Historial, DetalleMovimiento, Estadisticas, Metas, AnadirFondos,
-            Perfil, MisDatos, Escanear, ComprobanteRevision
+            Perfil, MisDatos, SeguridadCuenta, Escanear, ComprobanteRevision
         )
     }
 }

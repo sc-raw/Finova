@@ -139,7 +139,9 @@ fun DetalleMovimientoScreen(
                     }
                     Spacer(Modifier.height(10.dp))
 
-                    if (mov.tipoMovimiento != "TRANSFERENCIA") {
+                    if (mov.tipoMovimiento != "TRANSFERENCIA" &&
+                        mov.tipoMovimiento != "APORTE_META" &&
+                        mov.tipoMovimiento != "RETIRO_META") {
                         FilaDetalle(
                             icono = Icons.Outlined.Category,
                             iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
@@ -153,12 +155,18 @@ fun DetalleMovimientoScreen(
                         icono = Icons.Outlined.AccountBalance,
                         iconBg = FinovaSecondaryContainer.copy(alpha = 0.6f),
                         iconTint = FinovaSecondary,
-                        label = mov.cuentaOrigenNombre
+                        label = mov.cuentaOrigenBancoNombre
+                            ?: mov.cuentaDestinoBancoNombre
+                            ?: mov.cuentaOrigenNombre
                             ?: mov.cuentaDestinoNombre
                             ?: "Cuenta",
-                        valorTexto = "•••• ${(mov.cuentaOrigenId ?: mov.cuentaDestinoId ?: 0L).toString().takeLast(1)}"
+                        valorTexto = mov.cuentaOrigenNombre
+                            ?: mov.cuentaDestinoNombre
+                            ?: "•••• ${(mov.cuentaOrigenId ?: mov.cuentaDestinoId ?: 0L).toString().takeLast(1)}"
                     )
-                    if (mov.tipoMovimiento != "TRANSFERENCIA") {
+                    if (mov.tipoMovimiento != "TRANSFERENCIA" &&
+                        mov.tipoMovimiento != "APORTE_META" &&
+                        mov.tipoMovimiento != "RETIRO_META") {
                         Spacer(Modifier.height(6.dp))
                         FilaDetalle(
                             icono = Icons.Outlined.CreditCard,

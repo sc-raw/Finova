@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,6 +42,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.theme.FinovaPrimary
+import com.example.Finova.core.design.theme.FinovaError
+import com.example.Finova.core.design.theme.FinovaSurface
+import com.example.Finova.core.design.theme.FinovaTitleMd
+import com.example.Finova.core.design.theme.FinovaBodyMd
 import com.example.Finova.core.network.ApiClient
 import com.example.Finova.core.network.dto.CategoriaDto
 import com.example.Finova.core.network.dto.MovimientoDto
@@ -62,6 +70,7 @@ fun EditarMovimientoScreen(
     var cargando by remember { mutableStateOf(true) }
     var guardando by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var mostrarModalGuardado by remember { mutableStateOf(false) }
 
     LaunchedEffect(movimientoId) {
         cargando = true
@@ -94,6 +103,33 @@ fun EditarMovimientoScreen(
     val categoriasDisponibles = categorias.filter {
         it.tipo.equals(tipoCategoria, ignoreCase = true)
     }.ifEmpty { categorias }
+
+    if (mostrarModalGuardado) {
+        AlertDialog(
+            onDismissRequest = {
+                mostrarModalGuardado = false
+                onGuardado()
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = FinovaPrimary,
+                    modifier = Modifier.height(36.dp)
+                )
+            },
+            title = { Text("¡Cambios guardados!", style = FinovaTitleMd) },
+            text = { Text("El movimiento se actualizó correctamente.", style = FinovaBodyMd) },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarModalGuardado = false
+                    onGuardado()
+                }) { Text("Entendido") }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = FinovaSurface
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -239,7 +275,7 @@ fun EditarMovimientoScreen(
                                     categoriaId = categoria.id
                                 )
                             )
-                            onGuardado()
+                            mostrarModalGuardado = true
                         } catch (e: Exception) {
                             error = "No se pudieron guardar los cambios: ${e.message ?: "Error de conexión"}"
                         } finally {

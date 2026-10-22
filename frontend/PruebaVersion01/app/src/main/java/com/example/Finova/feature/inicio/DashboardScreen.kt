@@ -73,7 +73,6 @@ fun DashboardScreen(
         .map { dto -> dto.toVisual() }
 
     val nombre = viewModel.nombresUsuario.ifBlank { "Usuario" }
-    val mes = "Marzo 2025" // TODO: usar Formatters para el mes actual
     val saldoTotalSoles = viewModel.saldoTotalSoles
     val saldoTotalUsd = viewModel.saldoTotalUsd
     val tipoCambio = viewModel.tipoCambio
@@ -120,9 +119,15 @@ fun DashboardScreen(
             item {
                 SaludoHeader(
                     nombre = nombre,
-                    mes = mes,
                     saldosOcultos = saldosOcultos,
                     onToggleSaldos = { saldosOcultos = !saldosOcultos }
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Tus Productos",
+                    style = FinovaHeadlineSm,
+                    color = FinovaOnSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
 
@@ -160,15 +165,10 @@ fun DashboardScreen(
 
             item {
                 Spacer(Modifier.height(24.dp))
-                SeccionTitulo(
-                    titulo = "Operaciones rápidas",
-                    accionTexto = "Ver cuentas",
-                    onAccionClick = { onNavigate("mis_cuentas") }
-                )
+                SeccionTitulo(titulo = "Operaciones rápidas")
                 Spacer(Modifier.height(12.dp))
                 OperacionesRapidas(
                     onTransferir = { onNavigate("transferir") },
-                    onCambiarDolares = { /* La pantalla de cambio de dólares aún no está registrada en la navegación. */ },
                     onNuevoMovimiento = { onNavigate("nuevo_movimiento") },
                     onMisCuentas = { onNavigate("mis_cuentas") }
                 )
@@ -271,7 +271,6 @@ private fun MovimientoDto.toVisual(): MovimientoVisual {
 @Composable
 private fun SaludoHeader(
     nombre: String,
-    mes: String,
     saldosOcultos: Boolean,
     onToggleSaldos: () -> Unit
 ) {
@@ -279,44 +278,38 @@ private fun SaludoHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "¡Hola, $nombre!",
-                    style = FinovaHeadlineMd,
-                    color = FinovaOnSurface
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(text = "👋", style = FinovaHeadlineMd)
-            }
-            Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = null,
-                    tint = FinovaSecondary,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = mes,
-                    style = FinovaBodySm,
-                    color = FinovaOnSurfaceVariant
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("•", style = FinovaBodySm, color = FinovaOutlineVariant)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "Finanzas al día",
-                    style = FinovaBodySm,
-                    color = FinovaOnSurfaceVariant
-                )
-            }
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF027F71)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "F",
+                color = Color.White,
+                style = FinovaHeadlineMd,
+                fontWeight = FontWeight.Bold
+            )
         }
-
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "FINOVA",
+                style = FinovaLabelSm,
+                color = FinovaPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Hola, $nombre",
+                style = FinovaHeadlineMd,
+                color = FinovaOnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -478,7 +471,7 @@ private fun MiniStatCard(
             Icon(
                 imageVector = icono,
                 contentDescription = null,
-                tint = FinovaOnPrimary,
+                tint = if (label.equals("Gastos", ignoreCase = true)) Color(0xFFFF4D4F) else FinovaOnPrimary,
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -538,7 +531,6 @@ private fun SeccionTitulo(
 @Composable
 private fun OperacionesRapidas(
     onTransferir: () -> Unit,
-    onCambiarDolares: () -> Unit,
     onNuevoMovimiento: () -> Unit,
     onMisCuentas: () -> Unit
 ) {
@@ -546,12 +538,11 @@ private fun OperacionesRapidas(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        OperacionItem("Transferir", Icons.Outlined.SwapHoriz, onTransferir, Modifier.weight(1f))
-        OperacionItem("Cambiar\ndólares", Icons.Outlined.CurrencyExchange, onCambiarDolares, Modifier.weight(1f))
-        OperacionItem("Nuevo\nmovimiento", Icons.Outlined.AddCircleOutline, onNuevoMovimiento, Modifier.weight(1f))
-        OperacionItem("Mis\ncuentas", Icons.Outlined.AccountBalanceWallet, onMisCuentas, Modifier.weight(1f))
+        OperacionItem("Nueva Transferencia", Icons.Outlined.SwapHoriz, onTransferir, Modifier.weight(1f))
+        OperacionItem("Nuevo Movimiento", Icons.Outlined.AddCircleOutline, onNuevoMovimiento, Modifier.weight(1f))
+        OperacionItem("Mis Cuentas", Icons.Outlined.AccountBalanceWallet, onMisCuentas, Modifier.weight(1f))
     }
 }
 

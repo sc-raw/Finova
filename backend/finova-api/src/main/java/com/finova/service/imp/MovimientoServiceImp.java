@@ -300,6 +300,7 @@ public class MovimientoServiceImp implements MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String moneda,
             String titulo,
             String descripcion) {
 
@@ -325,6 +326,7 @@ public class MovimientoServiceImp implements MovimientoService {
                 );
 
         validarMonto(monto);
+                validarMonedaCuenta(cuenta, moneda);
         validarCategoriaParaMovimiento(categoria, TipoMovimiento.GASTO);
         validarSaldo(cuenta, monto);
 
@@ -354,6 +356,7 @@ public class MovimientoServiceImp implements MovimientoService {
             Long categoriaId,
             Long metodoPagoId,
             BigDecimal monto,
+            String moneda,
             String titulo,
             String descripcion) {
 
@@ -379,6 +382,7 @@ public class MovimientoServiceImp implements MovimientoService {
                 );
 
         validarMonto(monto);
+                validarMonedaCuenta(cuenta, moneda);
         validarCategoriaParaMovimiento(categoria, TipoMovimiento.INGRESO);
 
         cuenta.setSaldoActual(cuenta.getSaldoActual().add(monto));
@@ -438,20 +442,39 @@ public class MovimientoServiceImp implements MovimientoService {
 	                     )
 	             );
 	
-	     validarSaldo(origen, monto);
-	
-	     origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
-	     destino.setSaldoActual(destino.getSaldoActual().add(monto));
-	
-	     Movimiento movimiento = new Movimiento();
-	     movimiento.setCuentaOrigen(origen);
-	     movimiento.setCuentaDestino(destino);
-	     movimiento.setMonto(monto);
-	     movimiento.setTitulo("Transferencia entre cuentas");
-	     movimiento.setDescripcion(descripcion);
-	     movimiento.setTipoMovimiento(TipoMovimiento.TRANSFERENCIA);
-	     movimiento.setFechaMovimiento(LocalDateTime.now());
-	
+         validarSaldo(origen, monto);
+
+         // Tipo de cambio fijo para conversiones entre PEN y USD.
+         final BigDecimal tipoCambio = new BigDecimal("3.75");
+         BigDecimal montoDestino = monto;
+         String detalleConversion = "";
+
+         if (origen.getMoneda() != destino.getMoneda()) {
+             if (origen.getMoneda() == com.finova.entity.Moneda.USD) {
+                 // USD -> PEN: multiplicar por el tipo de cambio.
+                 montoDestino = monto.multiply(tipoCambio)
+                         .setScale(2, java.math.RoundingMode.HALF_UP);
+                 detalleConversion = " | Conversión USD a PEN; T.C. 1 USD = S/ " + tipoCambio;
+             } else {
+                 // PEN -> USD: dividir entre el tipo de cambio.
+                 montoDestino = monto.divide(tipoCambio, 2, java.math.RoundingMode.HALF_UP);
+                 detalleConversion = " | Conversión PEN a USD; T.C. 1 USD = S/ " + tipoCambio;
+             }
+         }
+
+         // Cada cuenta conserva su moneda y recibe el importe correspondiente.
+         origen.setSaldoActual(origen.getSaldoActual().subtract(monto));
+         destino.setSaldoActual(destino.getSaldoActual().add(montoDestino));
+
+         Movimiento movimiento = new Movimiento();
+         movimiento.setCuentaOrigen(origen);
+         movimiento.setCuentaDestino(destino);
+         movimiento.setMonto(monto);
+         movimiento.setTitulo("Transferencia entre cuentas");
+         movimiento.setDescripcion((descripcion == null ? "" : descripcion) + detalleConversion);
+         movimiento.setTipoMovimiento(TipoMovimiento.TRANSFERENCIA);
+         movimiento.setFechaMovimiento(LocalDateTime.now());
+
 	     cuentaRepository.save(origen);
 	     cuentaRepository.save(destino);
 	     movimientoRepository.save(movimiento);
@@ -1074,6 +1097,19 @@ public class MovimientoServiceImp implements MovimientoService {
     // =========================================================
     // VALIDAR SALDO
     // =========================================================
+
+    private void validarMonedaCuenta(Cuenta cuenta, String monedaSolicitada) {
+        if (monedaSolicitada == null || monedaSolicitada.isBlank()) {
+            throw new ReglaNegocioException("La moneda del movimiento es obligatoria");
+        }
+        String monedaNormalizada = monedaSolicitada.trim().toUpperCase();
+        if (!monedaNormalizada.equals("PEN") && !monedaNormalizada.equals("USD")) {
+            throw new ReglaNegocioException("Moneda no válida. Usa PEN o USD");
+        }
+        if (cuenta.getMoneda() == null || !cuenta.getMoneda().name().equals(monedaNormalizada)) {
+            throw new ReglaNegocioException("La moneda seleccionada no coincide con la moneda de la cuenta");
+        }
+    }
 
     private void validarSaldo(Cuenta cuenta, BigDecimal monto) {
         if (cuenta == null) {

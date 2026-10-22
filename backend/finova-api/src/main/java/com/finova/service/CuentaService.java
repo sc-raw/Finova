@@ -19,6 +19,10 @@ public interface CuentaService {
 
     void eliminar(Long id);
 
+    void eliminarSinSaldo(Long id);
+
+    void eliminarConTransferencia(Long id, Long cuentaDestinoId);
+
     void actualizarSaldo(Long cuentaId, BigDecimal nuevoSaldo);
 
     void sumarSaldo(Long cuentaId, BigDecimal monto);

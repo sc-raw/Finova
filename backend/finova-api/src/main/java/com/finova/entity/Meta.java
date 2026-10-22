@@ -12,6 +12,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -36,6 +38,10 @@ public class Meta {
 	@Column(nullable = false)
 	private String nombre;
 	
+	@Enumerated(EnumType.STRING)
+	@Column(name = "moneda", nullable = false, length = 3)
+	private Moneda moneda = Moneda.PEN;
+
 	@Column(name="monto_objetivo", nullable = false, precision = 15, scale =2)
 	private BigDecimal montoObjetivo;
 	
