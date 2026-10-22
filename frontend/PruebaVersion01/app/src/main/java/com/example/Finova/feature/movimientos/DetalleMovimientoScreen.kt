@@ -1,10 +1,5 @@
 package com.example.Finova.feature.movimientos
 
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.launch
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,9 +39,6 @@ fun DetalleMovimientoScreen(
     onEdit: (Long) -> Unit,
     viewModel: MovimientosViewModel = viewModel()
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var consultandoBoleta by remember { mutableStateOf(false) }
 
     val cargando by viewModel.cargando.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -191,82 +183,6 @@ fun DetalleMovimientoScreen(
 
                 // ---------- Acciones para movimientos manuales ----------
                 if (permiteAcciones) {
-                    // ---------- Botón Ver boleta ----------
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                consultandoBoleta = true
-                                try {
-                                    val comprobante = com.example.Finova.core.network.ApiClient.apiService
-                                        .obtenerComprobantePorMovimiento(mov.id)
-                                    val ruta = comprobante.rutaComprobante?.trim().orEmpty()
-
-                                    if (ruta.isBlank()) {
-                                        Toast.makeText(
-                                            context,
-                                            "Este movimiento no tiene una boleta adjunta.",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    } else {
-                                        val uri = when {
-                                            ruta.startsWith("http://", true) ||
-                                                    ruta.startsWith("https://", true) ||
-                                                    ruta.startsWith("content://", true) ||
-                                                    ruta.startsWith("file://", true) -> Uri.parse(ruta)
-                                            else -> Uri.fromFile(java.io.File(ruta))
-                                        }
-                                        val mimeType = if (ruta.substringBefore("?")
-                                                .endsWith(".pdf", ignoreCase = true)
-                                        ) "application/pdf" else "image/*"
-
-                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            setDataAndType(uri, mimeType)
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(intent)
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "No se pudo abrir la boleta. Verifica que exista un comprobante asociado.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } finally {
-                                    consultandoBoleta = false
-                                }
-                            }
-                        },
-                        enabled = !consultandoBoleta,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FinovaPrimary,
-                            contentColor = FinovaOnPrimary
-                        )
-                    ) {
-                        if (consultandoBoleta) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = FinovaOnPrimary,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Buscando boleta...", style = FinovaLabelLg)
-                        } else {
-                            Icon(
-                                imageVector = Icons.Outlined.ReceiptLong,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Ver boleta", style = FinovaLabelLg)
-                        }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
                     // ---------- Editar y eliminar ----------
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(

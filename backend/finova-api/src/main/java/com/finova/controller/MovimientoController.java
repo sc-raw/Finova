@@ -24,16 +24,6 @@ public class MovimientoController {
 
     private final MovimientoService movimientoService;
 
-    @GetMapping
-    public ResponseEntity<List<MovimientoResponseDTO>> listarMovimientos() {
-        return ResponseEntity.ok(
-                movimientoService.listarMovimientos()
-                        .stream()
-                        .map(MovimientoResponseDTO::desdeEntidad)
-                        .toList()
-        );
-    }
-
     @GetMapping("/usuario/{usuarioId}")
     public ResponseEntity<List<MovimientoResponseDTO>> listarPorUsuario(
             @PathVariable Long usuarioId) {

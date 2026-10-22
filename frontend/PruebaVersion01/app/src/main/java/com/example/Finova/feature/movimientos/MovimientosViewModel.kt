@@ -21,7 +21,6 @@ class MovimientosViewModel(application: Application) : AndroidViewModel(applicat
 
     private val repository = MovimientosRepository()
     private val sessionManager = SessionManager(application)
-    private val usuarioId: Long = sessionManager.obtenerUsuarioId()
 
     // ============ LISTA DE MOVIMIENTOS ============
     private val _movimientos = MutableStateFlow<List<MovimientoDto>>(emptyList())
@@ -57,11 +56,7 @@ class MovimientosViewModel(application: Application) : AndroidViewModel(applicat
     val eliminadoExitoso: StateFlow<Boolean> = _eliminadoExitoso
 
     init {
-        if (usuarioId != -1L) {
-            cargarMovimientos()
-        } else {
-            _error.value = "No hay sesión activa"
-        }
+        cargarMovimientos()
     }
 
     // ============ CARGAR ============
@@ -70,6 +65,14 @@ class MovimientosViewModel(application: Application) : AndroidViewModel(applicat
             _cargando.value = true
             _error.value = null
             try {
+                // Leer el usuario activo al cargar, evitando conservar un ID de sesión anterior.
+                val usuarioId = sessionManager.obtenerUsuarioId()
+                if (usuarioId <= 0L) {
+                    _movimientos.value = emptyList()
+                    _movimientosFiltrados.value = emptyList()
+                    _error.value = "No hay sesión activa"
+                    return@launch
+                }
                 val lista = repository.obtenerMovimientosPorUsuario(usuarioId)
                 _movimientos.value = lista
                 aplicarFiltro(_filtroActual.value, _textoBusqueda.value)

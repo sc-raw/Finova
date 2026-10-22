@@ -78,48 +78,27 @@ public class MovimientoServiceImp implements MovimientoService {
             );
         }
 
+        // Los ingresos guardan la cuenta asociada como cuentaDestino;
+        // los demás movimientos pertenecen al propietario de cuentaOrigen.
+        // En transferencias se conserva el historial del usuario que las inicia.
         return movimientoRepository.findAll()
                 .stream()
                 .filter(movimiento -> {
-                    boolean cuentaOrigenPertenece =
-                            movimiento.getCuentaOrigen() != null
-                            && movimiento.getCuentaOrigen().getUsuario() != null
-                            && usuarioId.equals(
-                                    movimiento.getCuentaOrigen()
-                                            .getUsuario().getId()
-                            );
+                    Cuenta cuentaPropietaria = movimiento.getTipoMovimiento() == TipoMovimiento.INGRESO
+                            ? movimiento.getCuentaDestino()
+                            : movimiento.getCuentaOrigen();
 
-                    boolean cuentaDestinoPertenece =
-                            movimiento.getCuentaDestino() != null
-                            && movimiento.getCuentaDestino().getUsuario() != null
-                            && usuarioId.equals(
-                                    movimiento.getCuentaDestino()
-                                            .getUsuario().getId()
-                            );
-
-                    return cuentaOrigenPertenece || cuentaDestinoPertenece;
+                    return cuentaPropietaria != null
+                            && cuentaPropietaria.getUsuario() != null
+                            && usuarioId.equals(cuentaPropietaria.getUsuario().getId());
                 })
                 .sorted((a, b) -> {
-                    if (a.getFechaMovimiento() == null
-                            && b.getFechaMovimiento() != null) {
-                        return 1;
-                    }
-
-                    if (a.getFechaMovimiento() != null
-                            && b.getFechaMovimiento() == null) {
-                        return -1;
-                    }
-
+                    if (a.getFechaMovimiento() == null && b.getFechaMovimiento() != null) return 1;
+                    if (a.getFechaMovimiento() != null && b.getFechaMovimiento() == null) return -1;
                     if (a.getFechaMovimiento() != null) {
-                        int comparacion = b.getFechaMovimiento()
-                                .compareTo(a.getFechaMovimiento());
-
-                        if (comparacion != 0) {
-                            return comparacion;
-                        }
+                        int comparacion = b.getFechaMovimiento().compareTo(a.getFechaMovimiento());
+                        if (comparacion != 0) return comparacion;
                     }
-
-                    // Si las fechas coinciden, mostrar primero el ID más reciente.
                     return Long.compare(b.getId(), a.getId());
                 })
                 .toList();
@@ -441,6 +420,14 @@ public class MovimientoServiceImp implements MovimientoService {
 	                             "Cuenta de destino no encontrada"
 	                     )
 	             );
+
+         if (origen.getUsuario() == null || destino.getUsuario() == null
+                 || origen.getUsuario().getId() == null
+                 || !origen.getUsuario().getId().equals(destino.getUsuario().getId())) {
+             throw new ReglaNegocioException(
+                     "Solo puedes transferir entre cuentas de tu propio usuario"
+             );
+         }
 	
          validarSaldo(origen, monto);
 

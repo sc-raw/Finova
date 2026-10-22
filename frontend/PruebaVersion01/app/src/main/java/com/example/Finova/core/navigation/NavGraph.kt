@@ -47,8 +47,6 @@ import com.example.Finova.feature.perfil.CambiarPasswordScreen
 @Composable
 fun NavGraph(navController: NavHostController = rememberNavController()) {
 
-    val historialViewModel: MovimientosViewModel = viewModel()
-
     // Helper: navega evitando duplicados en el back stack
     val goTo: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -138,6 +136,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         // ---------- MOVIMIENTOS ----------
         composable(Screen.Historial.route) {
+            val historialViewModel: MovimientosViewModel = viewModel()
+
             LaunchedEffect(Unit) {
                 historialViewModel.cargarMovimientos()
             }
