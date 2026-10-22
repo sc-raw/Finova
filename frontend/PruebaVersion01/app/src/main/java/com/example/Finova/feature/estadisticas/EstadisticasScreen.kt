@@ -10,8 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -502,36 +500,6 @@ fun EstadisticasScreen(
                     }
                 }
             }
-
-            // ---------- Botón Descargar reporte ----------
-            item {
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = FinovaPrimaryContainer,
-                        contentColor = FinovaOnPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Descargar reporte",
-                        style = FinovaLabelLg,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(Modifier.height(24.dp))
-            }
         }
     }
 
@@ -609,28 +577,6 @@ private fun EstadisticasTopBar(onBack: () -> Unit) {
                     color = FinovaOnSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
-                )
-            }
-            IconButton(onClick = { }) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notificaciones",
-                    tint = FinovaOnSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(FinovaPrimary),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = FinovaOnPrimary,
-                    modifier = Modifier.size(18.dp)
                 )
             }
         }

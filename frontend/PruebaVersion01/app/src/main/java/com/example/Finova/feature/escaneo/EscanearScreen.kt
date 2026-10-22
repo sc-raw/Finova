@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.example.Finova.core.design.theme.*
 
 import android.net.Uri
+import android.content.Context
+import androidx.core.content.FileProvider
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
@@ -33,347 +38,53 @@ import androidx.activity.result.contract.ActivityResultContracts
 @Composable
 fun EscanearScreen(
     onBack: () -> Unit,
-    onComprobanteCapturado: () -> Unit,
+    onComprobanteCapturado: (Uri) -> Unit,
     onImagenSeleccionada: (Uri) -> Unit
 ) {
-    var flashOn by remember { mutableStateOf(false) }
-    var tabActiva by remember { mutableStateOf("boleta") }
-    var mostrarTips by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var uriCapturaPendiente by remember { mutableStateOf<Uri?>(null) }
+    var camaraLanzada by remember { mutableStateOf(false) }
 
-    val selectorImagen = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            onImagenSeleccionada(uri)
+    val capturarFoto = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { guardada ->
+        val uri = uriCapturaPendiente
+        if (guardada && uri != null) {
+            onComprobanteCapturado(uri)
+        } else {
+            // Si el usuario cancela la cámara, volver a la pantalla anterior.
+            onBack()
+        }
+        uriCapturaPendiente = null
+    }
+
+    // Mantener una pantalla negra vacía mientras Android abre la cámara real.
+    // No renderizar la interfaz falsa de escaneo en ningún momento.
+    LaunchedEffect(Unit) {
+        if (!camaraLanzada) {
+            camaraLanzada = true
+            val uri = crearUriTemporalCaptura(context)
+            uriCapturaPendiente = uri
+            capturarFoto.launch(uri)
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1F26)) // Fondo oscuro tipo cámara
-    ) {
-        // ---------- Fondo de "cámara" (simulado) ----------
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF1A1F26),
-                            Color(0xFF2A3038),
-                            Color(0xFF1A1F26)
-                        )
-                    )
-                )
-        )
+            .background(Color.Black)
+    )
+}
 
-        // ---------- Contenido ----------
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 32.dp)
-        ) {
-            // ---------- Top Bar ----------
-            EscanearTopBar(
-                flashOn = flashOn,
-                onFlashToggle = { flashOn = !flashOn },
-                onBack = onBack
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // ---------- Tabs Boleta / Yape ----------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                TabEscanear(
-                    texto = "Boleta física",
-                    icono = Icons.Outlined.ReceiptLong,
-                    activo = tabActiva == "boleta",
-                    onClick = { tabActiva = "boleta" }
-                )
-                Spacer(Modifier.width(10.dp))
-                TabEscanear(
-                    texto = "Yape / Plin",
-                    icono = Icons.Outlined.PhoneAndroid,
-                    activo = tabActiva == "yape",
-                    onClick = { tabActiva = "yape" }
-                )
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // ---------- Marco de escaneo ----------
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp)
-                    .aspectRatio(0.75f),
-                contentAlignment = Alignment.Center
-            ) {
-                // Simulación de "boleta" detrás del marco
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF3A4148))
-                ) {
-                    // Texto simulado de boleta
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "SUPERMERCADO",
-                            style = FinovaLabelSm,
-                            color = Color(0xFF8A939B),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "PLAZA VEA - MIRAFLORES",
-                            style = FinovaLabelSm,
-                            color = Color(0xFF8A939B)
-                        )
-                        Text(
-                            text = "RUC: 20600023451",
-                            style = FinovaLabelSm,
-                            color = Color(0xFF8A939B)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        repeat(6) { i ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "PRODUCTO ${i + 1}",
-                                    style = FinovaLabelSm,
-                                    color = Color(0xFF6A737B)
-                                )
-                                Text(
-                                    text = "S/ ${(10 + i * 3)}.00",
-                                    style = FinovaLabelSm,
-                                    color = Color(0xFF6A737B)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Marco guía con esquinas teal
-                MarcoEscaner()
-
-                // Chip "IA activa"
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .offset(x = 8.dp, y = 8.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(FinovaTertiaryContainer)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = FinovaOnTertiaryContainer,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "¡IA activa!",
-                            style = FinovaLabelSm,
-                            color = FinovaOnTertiaryContainer,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                // Chip "Detectando total..."
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .offset(x = (-8).dp, y = (-8).dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xCC1A1F26))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(FinovaPrimaryFixed)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Detectando total...",
-                            style = FinovaLabelSm,
-                            color = FinovaInverseOnSurface
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            // ---------- Texto de ayuda ----------
-            Text(
-                text = "Apunta a la boleta, recibo o comprobante. Luka extraerá montos y fecha automáticamente.",
-                style = FinovaBodyMd,
-                color = FinovaInverseOnSurface.copy(alpha = 0.9f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ---------- Controles inferiores ----------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ControlInferior(
-                    icono = Icons.Outlined.PhotoLibrary,
-                    label = "Galería",
-                    onClick = {
-                        selectorImagen.launch("image/*")
-                    }
-                )
-                // Shutter (botón central grande)
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(FinovaPrimaryContainer)
-                        .clickable(onClick = onComprobanteCapturado),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(FinovaSurfaceContainerLowest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(FinovaPrimary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PhotoCamera,
-                                contentDescription = "Capturar",
-                                tint = FinovaOnPrimary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Ayuda
-                ControlInferior(
-                    icono = Icons.Outlined.Help,
-                    label = "Ayuda",
-                    onClick = { mostrarTips = true }
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ---------- Footer con notas ----------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Verified,
-                        contentDescription = null,
-                        tint = FinovaPrimaryFixed,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "Multi-moneda S/ y $",
-                        style = FinovaLabelSm,
-                        color = FinovaInverseOnSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = FinovaSecondaryFixed,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = "Cifrado seguro",
-                        style = FinovaLabelSm,
-                        color = FinovaInverseOnSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-
-    // ---------- Modal de tips ----------
-    if (mostrarTips) {
-        AlertDialog(
-            onDismissRequest = { mostrarTips = false },
-            confirmButton = {
-                Button(
-                    onClick = { mostrarTips = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = FinovaPrimary,
-                        contentColor = FinovaOnPrimary
-                    )
-                ) {
-                    Text("Entendido", style = FinovaLabelLg)
-                }
-            },
-            icon = {
-                Icon(
-                    imageVector = Icons.Outlined.TipsAndUpdates,
-                    contentDescription = null,
-                    tint = FinovaPrimary,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "Tips de escaneo",
-                    style = FinovaHeadlineSm,
-                    color = FinovaOnSurface
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TipItem("Asegura buena iluminación y evita sombras directas sobre los números.")
-                    TipItem("Mantén el comprobante estirado dentro del recuadro teal.")
-                    TipItem("Para Yape o Plin, puedes cargar la captura de pantalla desde galería.")
-                }
-            }
-        )
-    }
+// Crea una URI segura para que la aplicación de cámara guarde la fotografía.
+private fun crearUriTemporalCaptura(context: Context): Uri {
+    val carpeta = File(context.cacheDir, "comprobantes").apply { mkdirs() }
+    val archivo = File.createTempFile("comprobante_", ".jpg", carpeta)
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        archivo
+    )
 }
 
 // ============================================================

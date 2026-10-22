@@ -7,10 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SyncAlt
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -91,31 +88,12 @@ fun MisCuentasScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Cuentas (${cuentas.size})",
-                        style = FinovaHeadlineSm,
-                        color = FinovaOnSurface
-                    )
-                    FinovaTextButton(
-                        text = "Filtrar",
-                        onClick = { },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = FinovaPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    )
-                }
+                Text(
+                    text = "Cuentas (${cuentas.size})",
+                    style = FinovaHeadlineSm,
+                    color = FinovaOnSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
             }
 
             error?.let { msg ->
@@ -343,30 +321,6 @@ private fun CuentasTopBar() {
                     style = FinovaTitleMd,
                     color = FinovaOnSurface
                 )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { }) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notificaciones",
-                        tint = FinovaOnSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(FinovaPrimary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = FinovaOnPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
         }
     }

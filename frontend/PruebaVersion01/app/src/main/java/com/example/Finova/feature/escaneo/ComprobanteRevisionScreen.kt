@@ -83,6 +83,7 @@ fun ComprobanteRevisionScreen(
     var metodoPagoSeleccionado by remember { mutableStateOf<MetodoPagoDto?>(null) }
     var menuMetodosPagoAbierto by remember { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
+    var guardadoExitoso by remember { mutableStateOf(false) }
     var mensajeError by remember { mutableStateOf<String?>(null) }
     var errorMonto by remember { mutableStateOf<String?>(null) }
     var errorComercio by remember { mutableStateOf<String?>(null) }
@@ -90,6 +91,19 @@ fun ComprobanteRevisionScreen(
     var errorMetodoPago by remember { mutableStateOf<String?>(null) }
     var errorCategoria by remember { mutableStateOf<String?>(null) }
     var tipoMovimiento by remember { mutableStateOf("GASTO") }
+
+    // Solo mostrar cuentas cuya moneda coincide con la del comprobante.
+    val cuentasMoneda = cuentas.filter {
+        it.moneda.equals(monedaActiva, ignoreCase = true)
+    }
+
+    LaunchedEffect(monedaActiva, cuentas) {
+        if (cuentaSeleccionada?.moneda?.equals(monedaActiva, ignoreCase = true) != true) {
+            cuentaSeleccionada = cuentasMoneda.firstOrNull()
+        }
+        menuCuentasAbierto = false
+        errorCuenta = null
+    }
 
     var categorias by remember { mutableStateOf<List<CategoriaDto>>(emptyList()) }
     var categoriaSeleccionada by remember { mutableStateOf<CategoriaDto?>(null) }
@@ -114,8 +128,8 @@ fun ComprobanteRevisionScreen(
                     .listarCuentasPorUsuario(usuarioId)
                 metodosPago = ApiClient.apiService.listarMetodosPagoActivos()
 
-                if (cuentas.isNotEmpty()) {
-                    cuentaSeleccionada = cuentas.first()
+                cuentaSeleccionada = cuentas.firstOrNull {
+                    it.moneda.equals(monedaActiva, ignoreCase = true)
                 }
                 metodoPagoSeleccionado = metodosPago.firstOrNull()
             }
@@ -269,7 +283,7 @@ fun ComprobanteRevisionScreen(
                                     ApiClient.apiService.confirmarComprobante(request)
                                 }
 
-                                onConfirmar()
+                                guardadoExitoso = true
                             } catch (e: Exception) {
                                 mensajeError =
                                     "No se pudo guardar el comprobante: ${e.message ?: "Error desconocido"}"
@@ -299,15 +313,6 @@ fun ComprobanteRevisionScreen(
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(Modifier.height(12.dp))
-
-            if (mensajeError != null) {
-                Text(
-                    text = mensajeError!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = FinovaBodySm,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
 
             // ---------- Chips de estado ----------
             Row(
@@ -808,7 +813,7 @@ fun ComprobanteRevisionScreen(
                     expanded = menuCuentasAbierto,
                     onDismissRequest = { menuCuentasAbierto = false }
                 ) {
-                    cuentas.forEach { cuenta ->
+                    cuentasMoneda.forEach { cuenta ->
                         DropdownMenuItem(
                             text = {
                                 Text(cuenta.nombre ?: "Cuenta ${cuenta.id}")
@@ -821,9 +826,16 @@ fun ComprobanteRevisionScreen(
                         )
                     }
 
-                    if (cuentas.isEmpty()) {
+                    if (cuentasMoneda.isEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("No hay cuentas disponibles") },
+                            text = {
+                                Text(
+                                    if (monedaActiva == "PEN")
+                                        "No tienes cuentas en soles"
+                                    else
+                                        "No tienes cuentas en dólares"
+                                )
+                            },
                             onClick = { menuCuentasAbierto = false }
                         )
                     }
@@ -876,6 +888,123 @@ fun ComprobanteRevisionScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // Modal de error del OCR, con opción de volver a intentar desde la imagen.
+    if (errorOCR) {
+        AlertDialog(
+            onDismissRequest = { errorOCR = false },
+            title = { Text("No se pudo analizar la imagen") },
+            text = {
+                Text(
+                    textoOCR.removePrefix("Error: ").ifBlank {
+                        "Verifica la conexión e intenta nuevamente."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        errorOCR = false
+                        // Reinicia el análisis de la misma imagen.
+                        textoOCR = ""
+                        procesandoOCR = true
+                        scope.launch {
+                            try {
+                                val uri = imagenUri ?: throw Exception("No hay imagen seleccionada")
+                                val bytes = withContext(Dispatchers.IO) {
+                                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                                } ?: throw Exception("No se pudo leer la imagen")
+                                val parteImagen = MultipartBody.Part.createFormData(
+                                    "imagen",
+                                    "comprobante.jpg",
+                                    bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                                )
+                                val resultado = ApiClient.apiService.analizarImagen(parteImagen)
+                                comercio = resultado.comercio.orEmpty()
+                                monto = resultado.total
+                                    ?.takeIf { it > 0 }
+                                    ?.let { String.format(java.util.Locale.US, "%.2f", it) }
+                                    .orEmpty()
+                                monedaActiva = when (resultado.moneda?.uppercase()) {
+                                    "USD", "$" -> "USD"
+                                    else -> "PEN"
+                                }
+                                productosOCR = resultado.items.orEmpty().mapNotNull { item ->
+                                    val nombre = item.nombre.orEmpty().trim()
+                                    if (nombre.isBlank()) null else buildString {
+                                        append(nombre)
+                                        item.cantidad?.let { append(" × ").append(it) }
+                                        item.precio?.let {
+                                            append(" — ").append(monedaActiva).append(" ")
+                                                .append(String.format(java.util.Locale.US, "%.2f", it))
+                                        }
+                                    }
+                                }
+                                textoOCR = buildString {
+                                    resultado.comercio?.let { appendLine("Comercio: $it") }
+                                    resultado.ruc?.let { appendLine("RUC: $it") }
+                                    resultado.fecha?.let { appendLine("Fecha: $it") }
+                                    resultado.total?.let { appendLine("Total: $it") }
+                                }
+                                errorOCR = false
+                            } catch (e: Exception) {
+                                textoOCR = "Error: ${e.message ?: e.javaClass.simpleName}"
+                                errorOCR = true
+                            } finally {
+                                procesandoOCR = false
+                            }
+                        }
+                    }
+                ) { Text("Reintentar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { errorOCR = false }) { Text("Cerrar") }
+            }
+        )
+    }
+
+    if (guardadoExitoso) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Comprobante guardado") },
+            text = { Text("El movimiento se registró correctamente.") },
+            confirmButton = {
+                TextButton(onClick = onConfirmar) { Text("Continuar") }
+            }
+        )
+    }
+
+    // Modal para fallos al guardar.
+    if (mensajeError != null) {
+        AlertDialog(
+            onDismissRequest = { mensajeError = null },
+            title = { Text("No se pudo guardar") },
+            text = { Text(mensajeError.orEmpty()) },
+            confirmButton = {
+                TextButton(onClick = { mensajeError = null }) { Text("Entendido") }
+            }
+        )
+    }
+
+    if (procesandoOCR || guardando) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = {
+                Text(if (guardando) "Guardando comprobante" else "Analizando comprobante")
+            },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        if (guardando) "Registrando el movimiento..."
+                        else "Extrayendo los datos de la imagen..."
+                    )
+                }
+            },
+            confirmButton = { }
+        )
     }
 }
 

@@ -164,18 +164,18 @@ fun NuevoMovimientoScreen(
                         Icon(Icons.Filled.TrendingDown, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color(0xFFFFF5F4),
-                        labelColor = Color(0xFF424242),
-                        iconColor = Color(0xFFC62828),
-                        selectedContainerColor = Color(0xFFFFE1DE),
-                        selectedLabelColor = Color(0xFFC62828),
-                        selectedLeadingIconColor = Color(0xFFC62828)
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MaterialTheme.colorScheme.onSurface,
+                        iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedContainerColor = Color(0xFFDDF5EF),
+                        selectedLabelColor = FinovaPrimary,
+                        selectedLeadingIconColor = FinovaPrimary
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = tipo == "GASTO",
                         borderColor = Color(0xFFE0E0E0),
-                        selectedBorderColor = Color(0xFFE53935)
+                        selectedBorderColor = Color(0xFF9DE4D2)
                     )
                 )
                 Spacer(Modifier.width(10.dp))
@@ -188,9 +188,9 @@ fun NuevoMovimientoScreen(
                         Icon(Icons.Filled.TrendingUp, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color(0xFFF1FAF7),
-                        labelColor = Color(0xFF424242),
-                        iconColor = FinovaPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MaterialTheme.colorScheme.onSurface,
+                        iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         selectedContainerColor = Color(0xFFDDF5EF),
                         selectedLabelColor = FinovaPrimary,
                         selectedLeadingIconColor = FinovaPrimary

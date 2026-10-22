@@ -64,12 +64,18 @@ fun HistorialScreen(
     val movimientosDto by viewModel.movimientosFiltrados.collectAsState()
     val busqueda by viewModel.textoBusqueda.collectAsState()
     val filtroActual by viewModel.filtroActual.collectAsState()
+    var cantidadVisible by remember { mutableIntStateOf(20) }
 
-    // Mapear DTOs a modelo visual
-    val movimientosVisuales = movimientosDto.map { it.toHistorialVisual() }
+    LaunchedEffect(filtroActual, busqueda) {
+        cantidadVisible = 20
+    }
 
-    // Agrupar por fecha
-    val grupos: List<GrupoFecha> = agruparPorFecha(movimientosVisuales, movimientosDto)
+    // Mostrar inicialmente 20 movimientos; "Ver más" agrega otros 20 sin eliminar datos.
+    val movimientosVisiblesDto = movimientosDto.take(cantidadVisible)
+    val movimientosVisuales = movimientosVisiblesDto.map { it.toHistorialVisual() }
+
+    // Agrupar solo los movimientos visibles, manteniendo el orden y los filtros actuales.
+    val grupos: List<GrupoFecha> = agruparPorFecha(movimientosVisuales, movimientosVisiblesDto)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -290,32 +296,30 @@ fun HistorialScreen(
                 }
             }
 
-            // ---------- Exportar ----------
-            item {
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { }
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = null,
-                        tint = FinovaPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Exportar reporte mensual (PDF / Excel)",
-                        style = FinovaLabelMd,
-                        color = FinovaPrimary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+            // ---------- Ver más movimientos ----------
+            if (cantidadVisible < movimientosDto.size) {
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { cantidadVisible = (cantidadVisible + 20).coerceAtMost(movimientosDto.size) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FinovaPrimaryContainer,
+                            contentColor = FinovaOnPrimary
+                        )
+                    ) {
+                        Text(
+                            text = "Ver más movimientos",
+                            style = FinovaLabelLg,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.height(24.dp))
             }
         }
     }
@@ -490,29 +494,6 @@ private fun HistorialTopBar(onBack: () -> Unit) {
                     color = FinovaOnSurface
                 )
             }
-            IconButton(onClick = { }) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "Notificaciones",
-                    tint = FinovaOnSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(FinovaPrimary),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = FinovaOnPrimary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Spacer(Modifier.width(8.dp))
         }
     }
 }

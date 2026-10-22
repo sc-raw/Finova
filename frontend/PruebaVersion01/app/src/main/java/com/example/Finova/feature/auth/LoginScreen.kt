@@ -49,7 +49,7 @@ fun LoginScreen(
     LaunchedEffect(loginExitoso) {
         if (loginExitoso) {
             viewModel.resetearEstados()
-            onNavigate("dashboard")
+            onNavigate("cargando_finova")
         }
     }
 
@@ -68,10 +68,25 @@ fun LoginScreen(
         ) {
             Spacer(Modifier.height(40.dp))
 
-            // ---------- Logo ----------
-            FinovaLogo()
+            // ---------- Logo y bienvenida ----------
+            FinovaLogo(size = 64)
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = "Bienvenido a Finova",
+                style = FinovaHeadlineLg,
+                color = FinovaOnSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Ingresa para administrar tus finanzas.",
+                style = FinovaBodyMd,
+                color = FinovaOnSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(28.dp))
 
             // ---------- Card blanca con formulario ----------
             FinovaCard(
@@ -128,19 +143,37 @@ fun LoginScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                // ---------- Olvidé contraseña ----------
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                // ---------- Consejo de seguridad ----------
+                Surface(
+                    color = FinovaPrimaryContainer.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "¿Olvidaste tu contraseña?",
-                        style = FinovaLabelMd,
-                        color = FinovaPrimary,
-                        modifier = Modifier
-                            .clickable { /* TODO */ }
-                            .padding(vertical = 4.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Shield,
+                            contentDescription = null,
+                            tint = FinovaPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Consejo de seguridad",
+                                style = FinovaLabelMd,
+                                color = FinovaOnSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Recuerda guardar bien tu correo y tu contraseña.",
+                                style = FinovaBodySm,
+                                color = FinovaOnSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -212,7 +245,7 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "Crear cuenta",
+                    text = "Regístrate",
                     style = FinovaLabelLg,
                     color = FinovaPrimary,
                     modifier = Modifier

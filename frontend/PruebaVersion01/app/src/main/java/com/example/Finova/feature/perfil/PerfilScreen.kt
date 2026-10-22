@@ -217,30 +217,6 @@ private fun PerfilTopBar() {
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { }) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notificaciones",
-                        tint = FinovaOnSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(FinovaPrimary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = FinovaOnPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
         }
     }
 }

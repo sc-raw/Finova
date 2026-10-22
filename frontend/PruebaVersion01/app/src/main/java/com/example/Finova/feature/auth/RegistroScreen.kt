@@ -150,7 +150,7 @@ fun RegistroScreen(
                     label = "Nombres",
                     valor = nombres,
                     onValorChange = { nombres = it },
-                    placeholder = "Ej. Gerson Joel",
+                    placeholder = "Ej. Carlos Manuel",
                     icono = Icons.Outlined.Person
                 )
 
@@ -161,7 +161,7 @@ fun RegistroScreen(
                     label = "Apellidos",
                     valor = apellidos,
                     onValorChange = { apellidos = it },
-                    placeholder = "Ej. Silva Carrera",
+                    placeholder = "Ej. Flores Perez",
                     icono = Icons.Outlined.Person
                 )
 
@@ -172,7 +172,7 @@ fun RegistroScreen(
                     label = "Correo electrónico",
                     valor = correo,
                     onValorChange = { correo = it },
-                    placeholder = "andrea@correo.com",
+                    placeholder = "carlos@finova.com",
                     icono = Icons.Outlined.Mail,
                     keyboardType = KeyboardType.Email
                 )

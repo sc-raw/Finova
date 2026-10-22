@@ -71,3 +71,46 @@ fun SplashScreen(onTimeout: () -> Unit) {
         )
     }
 }
+
+
+// Pantalla breve que se muestra después de validar correctamente el inicio de sesión.
+@Composable
+fun CargandoFinovaScreen(onTimeout: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(900)
+        onTimeout()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(com.example.Finova.core.design.theme.FinovaBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
+            FinovaLogo(size = 88)
+            androidx.compose.foundation.layout.Spacer(Modifier.size(24.dp))
+            Text(
+                text = "Finova",
+                color = com.example.Finova.core.design.theme.FinovaOnSurface,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            androidx.compose.foundation.layout.Spacer(Modifier.size(10.dp))
+            Text(
+                text = "Preparando tus finanzas...",
+                color = com.example.Finova.core.design.theme.FinovaOnSurfaceVariant,
+                fontSize = 14.sp
+            )
+            androidx.compose.foundation.layout.Spacer(Modifier.size(24.dp))
+            androidx.compose.material3.CircularProgressIndicator(
+                color = com.example.Finova.core.design.theme.FinovaPrimary,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+    }
+}

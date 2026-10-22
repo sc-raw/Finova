@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import com.example.Finova.feature.auth.LoginScreen
 import com.example.Finova.feature.auth.RegistroScreen
 import com.example.Finova.feature.auth.SplashScreen
+import com.example.Finova.feature.auth.CargandoFinovaScreen
 
 // Inicio y Cuentas
 import com.example.Finova.feature.inicio.DashboardScreen
@@ -76,6 +77,17 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Screen.Login.route) {
             LoginScreen(onNavigate = goTo)
+        }
+
+        composable("cargando_finova") {
+            CargandoFinovaScreen(
+                onTimeout = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo("cargando_finova") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
         composable(Screen.Registro.route) {
@@ -224,7 +236,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 onBack = {
                     navController.popBackStack()
                 },
-                onComprobanteCapturado = {
+                onComprobanteCapturado = { uri ->
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("imagen_comprobante_uri", uri.toString())
+
                     goTo(Screen.ComprobanteRevision.route)
                 },
                 onImagenSeleccionada = { uri ->
